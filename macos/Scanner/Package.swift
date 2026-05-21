@@ -36,7 +36,8 @@ let package = Package(
         ),
         .executableTarget(
             name: "AIExposureScannerApp",
-            dependencies: ["Scanner"]
+            dependencies: ["Scanner"],
+            resources: [.process("buymeacoffee.png")]
         )
     ]
 )

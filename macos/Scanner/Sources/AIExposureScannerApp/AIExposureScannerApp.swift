@@ -661,19 +661,18 @@ struct SettingsView: View {
                 destination: URL(string: "https://github.com/tsechis/ai-exposure-scanner/releases")!
             )
 
-            HStack(spacing: 4) {
+            HStack(spacing: 8) {
                 Text("Made with ❤️ by Lukáš Oplt")
+                    .font(.footnote)
                     .foregroundStyle(.secondary)
-                Text("(")
-                    .foregroundStyle(.secondary)
-                Link(
-                    viewModel.text.string(.support),
-                    destination: URL(string: "https://lukasoplt.gumroad.com/coffee")!
-                )
-                Text(")")
-                    .foregroundStyle(.secondary)
+                Link(destination: URL(string: "https://www.buymeacoffee.com/lukasoplt")!) {
+                    Image("buymeacoffee", bundle: .module)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 36)
+                }
+                .buttonStyle(.plain)
             }
-            .font(.footnote)
         }
         .padding(24)
         .frame(width: 480)
