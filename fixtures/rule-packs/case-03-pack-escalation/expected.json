@@ -1,0 +1,24 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-MCP-003",
+      "severity": "critical",
+      "app": "rule-packs",
+      "serverName": "combo-server",
+      "escalationReason": "Broad filesystem access combined with network capability enables silent data upload"
+    },
+    {
+      "ruleId": "AES-MCP-004",
+      "severity": "critical",
+      "app": "rule-packs",
+      "serverName": "combo-server",
+      "escalationReason": "Broad filesystem access combined with network capability enables silent data upload"
+    },
+    {
+      "ruleId": "AES-MCP-007",
+      "severity": "medium",
+      "app": "rule-packs",
+      "serverName": "combo-server"
+    }
+  ]
+}

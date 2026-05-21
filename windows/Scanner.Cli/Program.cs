@@ -32,6 +32,7 @@ try
     {
         OutputFormat.Markdown => reportBuilder.Markdown(result),
         OutputFormat.Html => reportBuilder.Html(result),
+        OutputFormat.Json => reportBuilder.Json(result),
         _ => throw new ArgumentOutOfRangeException(nameof(options.Format), options.Format, null)
     };
 
@@ -81,7 +82,8 @@ internal enum OutputFormat
 {
     Markdown,
     Html,
-    Pdf
+    Pdf,
+    Json
 }
 
 internal sealed record CliOptions(
@@ -117,7 +119,7 @@ internal sealed record CliOptions(
                     }
                     if (!TryParseFormat(formatValue, out format))
                     {
-                        return Error("Invalid format. Use markdown, html, or pdf.");
+                        return Error("Invalid format. Use markdown, html, pdf, or json.");
                     }
                     break;
                 case "--output":
@@ -154,9 +156,10 @@ internal sealed record CliOptions(
               dotnet run --project windows/Scanner.Cli/Scanner.Cli.csproj -- [options]
 
             Options:
-              --format markdown|html|pdf
+              --format markdown|html|pdf|json
                                       Output format. Default: markdown.
                                       PDF writes a simple local report PDF.
+                                      JSON follows spec/report-schema.json.
               --output, -o <path>      Write report to a file instead of stdout.
               --home <path>            Override the home directory used by known-path detectors.
               --help, -h               Show help.
@@ -194,6 +197,9 @@ internal sealed record CliOptions(
                 return true;
             case "pdf":
                 format = OutputFormat.Pdf;
+                return true;
+            case "json":
+                format = OutputFormat.Json;
                 return true;
             default:
                 format = OutputFormat.Markdown;

@@ -21,9 +21,13 @@ let package = Package(
             targets: ["AIExposureScannerApp"]
         )
     ],
+    dependencies: [
+        .package(url: "https://github.com/jpsim/Yams.git", from: "5.0.0")
+    ],
     targets: [
         .target(
-            name: "Scanner"
+            name: "Scanner",
+            dependencies: [.product(name: "Yams", package: "Yams")]
         ),
         .executableTarget(
             name: "ScannerFixtureTests",

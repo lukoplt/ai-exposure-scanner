@@ -9,6 +9,7 @@ public struct Finding: Codable, Equatable, Hashable, Sendable {
     public let title: String
     public let explanation: String
     public let recommendation: String
+    public let escalationReason: String?
 
     public init(
         ruleId: String,
@@ -20,7 +21,8 @@ public struct Finding: Codable, Equatable, Hashable, Sendable {
         maskedValue: String? = nil,
         title: String,
         explanation: String,
-        recommendation: String
+        recommendation: String,
+        escalationReason: String? = nil
     ) {
         self.ruleId = ruleId
         self.severity = severity
@@ -32,5 +34,6 @@ public struct Finding: Codable, Equatable, Hashable, Sendable {
         self.title = title
         self.explanation = explanation
         self.recommendation = recommendation
+        self.escalationReason = escalationReason
     }
 }

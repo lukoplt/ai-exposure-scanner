@@ -4,10 +4,12 @@ using AIExposureScanner.Scanner.Filesystem;
 using AIExposureScanner.Scanner.Models;
 using AIExposureScanner.Scanner.Reporting;
 using AIExposureScanner.Scanner.Rules;
+using AIExposureScanner.Scanner.RulePacks;
 
 try
 {
     RunFixtureCorpus();
+    RunEscalationEvaluatorTests();
     RunRuleUnitTests();
     RunDetectorIntegrationTests();
     RunReportBuilderTests();
@@ -34,8 +36,30 @@ static void RunFixtureCorpus()
         var expectedFile = Path.Combine(Path.GetDirectoryName(inputFile)!, "expected.json");
         var appId = Directory.GetParent(Path.GetDirectoryName(inputFile)!)!.Name;
         var facts = FixtureFactBuilder.FactsFrom(inputFile, appId);
-        var actual = new RuleEvaluator()
-            .Evaluate(facts)
+        var builtInFindings = new RuleEvaluator().Evaluate(facts);
+
+        // Parse optional rulePacks from input.json
+        var loadedPacks = new List<RulePack>();
+        using (var doc2 = JsonDocument.Parse(File.ReadAllText(inputFile)))
+        {
+            if (doc2.RootElement.TryGetProperty("rulePacks", out var rulePacksEl))
+            {
+                foreach (var yamlEl in rulePacksEl.EnumerateArray())
+                {
+                    var yamlStr = yamlEl.GetString() ?? string.Empty;
+                    if (RulePackLoader.Load(yamlStr) is RulePackLoadResult.Valid v)
+                        loadedPacks.Add(v.Pack);
+                }
+            }
+        }
+
+        var allFindings = new RulePackEvaluator().Evaluate(facts, loadedPacks, builtInFindings);
+        var escalationRules = EscalationRules.BuiltIn
+            .Concat(loadedPacks.SelectMany(p => p.EscalationRules))
+            .ToList();
+        var escalated = new EscalationEvaluator().Evaluate(allFindings, escalationRules);
+
+        var actual = escalated
             .Select(ComparableFinding.FromFinding)
             .ToArray();
         var expected = ExpectedReport.Load(expectedFile)
@@ -49,6 +73,52 @@ static void RunFixtureCorpus()
             $"Fixture mismatch: {relative}{Environment.NewLine}actual: {string.Join(", ", actual.Select(x => x.ToString()))}{Environment.NewLine}expected: {string.Join(", ", expected.Select(x => x.ToString()))}"
         );
     }
+}
+
+static void RunEscalationEvaluatorTests()
+{
+    var mcp003 = new Finding("AES-MCP-003", Severity.High, "claude-desktop", ServerName: "fs", Title: "t", Explanation: "e", Recommendation: "r");
+    var mcp004 = new Finding("AES-MCP-004", Severity.High, "claude-desktop", ServerName: "fs", Title: "t", Explanation: "e", Recommendation: "r");
+
+    var perServerRule = new EscalationRule(
+        new HashSet<string>(StringComparer.Ordinal) { "AES-MCP-003", "AES-MCP-004" },
+        EscalationScope.PerServer, Severity.Critical, "test reason");
+
+    var escalated = new EscalationEvaluator().Evaluate([mcp003, mcp004], [perServerRule]);
+    Expect(escalated.All(f => f.Severity == Severity.Critical && f.EscalationReason == "test reason"),
+        "Per-server escalation should upgrade both findings to critical with reason");
+
+    var notEscalated = new EscalationEvaluator().Evaluate([mcp003], [perServerRule]);
+    Expect(notEscalated.All(f => f.EscalationReason is null),
+        "Should not escalate when not all required rule IDs are present");
+
+    // Different servers — per-server should NOT fire
+    var serverA = new Finding("AES-MCP-003", Severity.High, "claude-desktop", ServerName: "server-a", Title: "t", Explanation: "e", Recommendation: "r");
+    var serverB = new Finding("AES-MCP-004", Severity.High, "claude-desktop", ServerName: "server-b", Title: "t", Explanation: "e", Recommendation: "r");
+    var splitResult = new EscalationEvaluator().Evaluate([serverA, serverB], [perServerRule]);
+    Expect(splitResult.All(f => f.EscalationReason is null),
+        "Per-server escalation should not fire when required rules are on different servers");
+
+    // Global scope: 3 distinct servers
+    var globalRule = new EscalationRule(
+        new HashSet<string>(StringComparer.Ordinal) { "AES-MCP-004" },
+        EscalationScope.Global, Severity.Critical, "global test", MinimumDistinctServers: 3);
+    var findings3 = Enumerable.Range(1, 3)
+        .Select(i => new Finding("AES-MCP-004", Severity.High, "claude-desktop", ServerName: $"s{i}", Title: "t", Explanation: "e", Recommendation: "r"))
+        .ToArray();
+    var escalatedGlobal = new EscalationEvaluator().Evaluate(findings3, [globalRule]);
+    Expect(escalatedGlobal.All(f => f.Severity == Severity.Critical),
+        "Global escalation should fire when 3+ distinct servers match");
+
+    var notEscalatedGlobal = new EscalationEvaluator().Evaluate(findings3[..2], [globalRule]);
+    Expect(notEscalatedGlobal.All(f => f.EscalationReason is null),
+        "Global escalation should not fire with fewer than minimumDistinctServers");
+
+    // Already at target severity — no change
+    var alreadyCritical = new Finding("AES-MCP-002", Severity.Critical, "claude-desktop", ServerName: "fs", Title: "t", Explanation: "e", Recommendation: "r");
+    var noChange = new EscalationEvaluator().Evaluate([alreadyCritical, mcp004], [perServerRule]);
+    Expect(noChange.First(f => f.RuleId == "AES-MCP-002").EscalationReason is null,
+        "Should not add escalationReason to finding already at target severity");
 }
 
 static void RunRuleUnitTests()
@@ -528,7 +598,8 @@ internal sealed record ExpectedFinding(
     string Severity,
     string App,
     string? ServerName,
-    string? ExtensionId
+    string? ExtensionId,
+    string? EscalationReason = null
 );
 
 internal sealed record ComparableFinding(
@@ -536,7 +607,8 @@ internal sealed record ComparableFinding(
     string Severity,
     string App,
     string? ServerName,
-    string? ExtensionId
+    string? ExtensionId,
+    string? EscalationReason = null
 )
 {
     public static ComparableFinding FromFinding(Finding finding) =>
@@ -545,7 +617,8 @@ internal sealed record ComparableFinding(
             finding.Severity.ToJsonValue(),
             finding.App,
             finding.ServerName,
-            finding.ExtensionId
+            finding.ExtensionId,
+            finding.EscalationReason
         );
 
     public static ComparableFinding FromExpected(ExpectedFinding finding) =>
@@ -554,9 +627,10 @@ internal sealed record ComparableFinding(
             finding.Severity,
             finding.App,
             finding.ServerName,
-            finding.ExtensionId
+            finding.ExtensionId,
+            finding.EscalationReason
         );
 
     public override string ToString() =>
-        $"{Severity} {RuleId} {App} {ServerName ?? "nil"} {ExtensionId ?? "nil"}";
+        $"{Severity} {RuleId} {App} {ServerName ?? "nil"} {ExtensionId ?? "nil"} esc={EscalationReason ?? "nil"}";
 }

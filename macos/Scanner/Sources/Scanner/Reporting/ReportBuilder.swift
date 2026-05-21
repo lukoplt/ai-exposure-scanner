@@ -122,6 +122,51 @@ public struct ReportBuilder: Sendable {
         """
     }
 
+    public func json(scanResult: ScanResult, scannerVersion: String = "0.2.0", platform: String = "macos", scannedAt: Date = Date()) -> String {
+        let summary = ReportSummary(scanResult: scanResult)
+        let findingsArray: [[String: Any]] = scanResult.findings.map { f in
+            var dict: [String: Any] = [
+                "ruleId": f.ruleId,
+                "severity": f.severity.rawValue,
+                "app": f.app,
+                "serverName": f.serverName as Any,
+                "extensionId": f.extensionId as Any,
+                "affectedPath": f.affectedPath as Any,
+                "maskedValue": f.maskedValue as Any,
+                "escalationReason": f.escalationReason as Any,
+                "title": f.title,
+                "explanation": f.explanation,
+                "recommendation": f.recommendation
+            ]
+            // Replace Swift nil with NSNull for JSON serialization
+            for key in dict.keys {
+                if case Optional<Any>.none = dict[key] { dict[key] = NSNull() }
+            }
+            return dict
+        }
+        let root: [String: Any] = [
+            "schemaVersion": "1.0.0",
+            "scannerVersion": scannerVersion,
+            "scannedAt": Self.iso8601(scannedAt),
+            "platform": platform,
+            "status": summary.status.rawValue,
+            "summary": [
+                "toolsFound": summary.toolsFound,
+                "mcpServersFound": summary.mcpServersFound,
+                "critical": summary.critical,
+                "high": summary.high,
+                "medium": summary.medium,
+                "low": summary.low
+            ],
+            "findings": findingsArray
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys]),
+              let string = String(data: data, encoding: .utf8) else {
+            return "{}"
+        }
+        return string
+    }
+
     private func definition(_ label: String, _ value: String?) -> String {
         guard let value else {
             return ""

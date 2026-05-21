@@ -1,0 +1,43 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-MCP-004",
+      "severity": "critical",
+      "app": "claude-desktop",
+      "serverName": "fetch-cd",
+      "escalationReason": "Network access capability is exposed across three or more MCP servers — broad attack surface"
+    },
+    {
+      "ruleId": "AES-MCP-004",
+      "severity": "critical",
+      "app": "cursor",
+      "serverName": "fetch-cursor",
+      "escalationReason": "Network access capability is exposed across three or more MCP servers — broad attack surface"
+    },
+    {
+      "ruleId": "AES-MCP-004",
+      "severity": "critical",
+      "app": "windsurf",
+      "serverName": "fetch-ws",
+      "escalationReason": "Network access capability is exposed across three or more MCP servers — broad attack surface"
+    },
+    {
+      "ruleId": "AES-MCP-007",
+      "severity": "medium",
+      "app": "claude-desktop",
+      "serverName": "fetch-cd"
+    },
+    {
+      "ruleId": "AES-MCP-007",
+      "severity": "medium",
+      "app": "cursor",
+      "serverName": "fetch-cursor"
+    },
+    {
+      "ruleId": "AES-MCP-007",
+      "severity": "medium",
+      "app": "windsurf",
+      "serverName": "fetch-ws"
+    }
+  ]
+}

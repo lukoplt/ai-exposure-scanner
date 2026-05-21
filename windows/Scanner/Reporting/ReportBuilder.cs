@@ -1,6 +1,8 @@
 using System.Globalization;
 using System.Net;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using AIExposureScanner.Scanner.Models;
 
 namespace AIExposureScanner.Scanner.Reporting;
@@ -133,6 +135,52 @@ public sealed class ReportBuilder
         </html>
         """;
     }
+
+    public string Json(ScanResult scanResult, string scannerVersion = "0.2.0", string platform = "windows", DateTimeOffset? scannedAt = null)
+    {
+        var summary = ReportSummary.FromScanResult(scanResult);
+        var timestamp = Iso8601(scannedAt ?? DateTimeOffset.UtcNow);
+
+        var findings = scanResult.Findings.Select(f => new JsonFindingDto(
+            f.RuleId, f.Severity.ToJsonValue(), f.App,
+            f.ServerName, f.ExtensionId, f.AffectedPath, f.MaskedValue,
+            f.EscalationReason, f.Title, f.Explanation, f.Recommendation
+        )).ToArray();
+
+        var root = new JsonReportDto(
+            SchemaVersion: "1.0.0",
+            ScannerVersion: scannerVersion,
+            ScannedAt: timestamp,
+            Platform: platform,
+            Status: summary.Status.ToJsonValue(),
+            Summary: new JsonSummaryDto(
+                summary.ToolsFound, summary.McpServersFound,
+                summary.Critical, summary.High, summary.Medium, summary.Low),
+            Findings: findings
+        );
+
+        var options = new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            DefaultIgnoreCondition = JsonIgnoreCondition.Never,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+        return JsonSerializer.Serialize(root, options);
+    }
+
+    private sealed record JsonReportDto(
+        string SchemaVersion, string ScannerVersion, string ScannedAt,
+        string Platform, string Status, JsonSummaryDto Summary, JsonFindingDto[] Findings);
+
+    private sealed record JsonSummaryDto(
+        int ToolsFound, int McpServersFound,
+        int Critical, int High, int Medium, int Low);
+
+    private sealed record JsonFindingDto(
+        string RuleId, string Severity, string App,
+        string? ServerName, string? ExtensionId, string? AffectedPath,
+        string? MaskedValue, string? EscalationReason,
+        string Title, string Explanation, string Recommendation);
 
     public byte[] Pdf(ScanResult scanResult, DateTimeOffset? scannedAt = null)
     {

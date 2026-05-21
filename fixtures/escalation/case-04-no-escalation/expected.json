@@ -1,0 +1,16 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-MCP-003",
+      "severity": "high",
+      "app": "escalation",
+      "serverName": "local-files"
+    },
+    {
+      "ruleId": "AES-MCP-007",
+      "severity": "medium",
+      "app": "escalation",
+      "serverName": "local-files"
+    }
+  ]
+}

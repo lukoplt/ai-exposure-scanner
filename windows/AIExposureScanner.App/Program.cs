@@ -50,6 +50,7 @@ public sealed class MainWindow : Window
     private readonly Button _exportMarkdownButton = new();
     private readonly Button _exportHtmlButton = new();
     private readonly Button _exportPdfButton = new();
+    private readonly Button _exportJsonButton = new();
 
     public MainWindow()
     {
@@ -115,6 +116,11 @@ public sealed class MainWindow : Window
         _exportPdfButton.Margin = new Thickness(8, 0, 0, 0);
         _exportPdfButton.Click += (_, _) => ExportBytes("AIExposureScanner-Report.pdf", "PDF report (*.pdf)|*.pdf", r => _reportBuilder.Pdf(r));
         panel.Children.Add(_exportPdfButton);
+
+        _exportJsonButton.Content = "JSON";
+        _exportJsonButton.Margin = new Thickness(8, 0, 0, 0);
+        _exportJsonButton.Click += (_, _) => Export("AIExposureScanner-Report.json", "JSON report (*.json)|*.json", r => _reportBuilder.Json(r));
+        panel.Children.Add(_exportJsonButton);
 
         UpdateExportButtons();
         return panel;
@@ -377,6 +383,7 @@ public sealed class MainWindow : Window
         _exportMarkdownButton.IsEnabled = hasResult;
         _exportHtmlButton.IsEnabled = hasResult;
         _exportPdfButton.IsEnabled = hasResult;
+        _exportJsonButton.IsEnabled = hasResult;
     }
 
     private static Button Button(string content, RoutedEventHandler onClick)

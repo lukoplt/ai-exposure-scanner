@@ -1,6 +1,7 @@
 using AIExposureScanner.Scanner.Detectors;
 using AIExposureScanner.Scanner.Filesystem;
 using AIExposureScanner.Scanner.Models;
+using AIExposureScanner.Scanner.RulePacks;
 
 namespace AIExposureScanner.Scanner;
 
@@ -15,8 +16,13 @@ public sealed class ScanOrchestrator
     public IReadOnlyList<IDetector> Detectors { get; }
     public RuleEvaluator Evaluator { get; }
 
-    public async Task<ScanResult> ScanAsync(IFilesystemFacade fs, CancellationToken ct = default)
+    public async Task<ScanResult> ScanAsync(
+        IFilesystemFacade fs,
+        CancellationToken ct = default,
+        IReadOnlyList<RulePack>? packs = null)
     {
+        packs ??= [];
+
         var tasks = Detectors.Select(async detector =>
         {
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -39,7 +45,14 @@ public sealed class ScanOrchestrator
         var merged = new ScanFacts();
         foreach (var f in allFacts) merged.Append(f);
 
-        return new ScanResult(merged, Evaluator.Evaluate(merged));
+        var builtInFindings = Evaluator.Evaluate(merged);
+        var allFindings = new RulePackEvaluator().Evaluate(merged, packs, builtInFindings);
+        var escalationRules = EscalationRules.BuiltIn
+            .Concat(packs.SelectMany(p => p.EscalationRules))
+            .ToList();
+        var escalated = new EscalationEvaluator().Evaluate(allFindings, escalationRules);
+
+        return new ScanResult(merged, escalated);
     }
 
     /// <summary>Synchronous shim for tests and legacy callers.</summary>

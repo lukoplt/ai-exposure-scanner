@@ -1,0 +1,13 @@
+{
+  "_type": "claude-desktop",
+  "mcpServers": {
+    "dev-tool": {
+      "command": "npx",
+      "args": ["@some/dev-tool"],
+      "description": "Dev tool without version pin"
+    }
+  },
+  "rulePacks": [
+    "version: '1.0'\nid: dev-overrides\nname: Dev Environment Overrides\noverrides:\n  - id: AES-MCP-007\n    severity: low\n"
+  ]
+}

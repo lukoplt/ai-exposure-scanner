@@ -1,0 +1,13 @@
+{
+  "_type": "claude-desktop",
+  "mcpServers": {
+    "internal-tool": {
+      "command": "npx",
+      "args": ["@acme/internal-mcp-server"],
+      "description": "Internal ACME tool"
+    }
+  },
+  "rulePacks": [
+    "version: '1.0'\nid: acme-rules\nname: ACME Org Rules\nrules:\n  - id: ACME-001\n    severity: high\n    title: Internal MCP Server Detected\n    explanation: The ACME internal MCP server is present. Ensure it is approved.\n    recommendation: Verify this server is on the approved list.\n    match:\n      fact: mcp_server\n      args_contain: '@acme/internal-mcp-server'\n"
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "_type": "cross-client",
+  "clients": {
+    "claude-desktop": {
+      "mcpServers": {
+        "fetch-cd": {
+          "command": "npx",
+          "args": ["@modelcontextprotocol/server-fetch"],
+          "description": "Fetch via Claude Desktop"
+        }
+      }
+    },
+    "cursor": {
+      "mcpServers": {
+        "fetch-cursor": {
+          "command": "npx",
+          "args": ["@modelcontextprotocol/server-fetch"],
+          "description": "Fetch via Cursor"
+        }
+      }
+    },
+    "windsurf": {
+      "mcpServers": {
+        "fetch-ws": {
+          "command": "npx",
+          "args": ["@modelcontextprotocol/server-fetch"],
+          "description": "Fetch via Windsurf"
+        }
+      }
+    }
+  }
+}

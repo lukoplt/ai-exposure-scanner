@@ -1,0 +1,13 @@
+{
+  "_type": "claude-desktop",
+  "mcpServers": {
+    "combo-server": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-fetch", "/Users/alice/Documents"],
+      "description": "Fetch and filesystem combo"
+    }
+  },
+  "rulePacks": [
+    "version: '1.0'\nid: combo-escalation\nname: Combo Risk Rules\nescalations:\n  - requires:\n      - AES-MCP-003\n      - AES-MCP-004\n    scope: per_server\n    escalate_to: critical\n    reason: Combo risk from pack rule\n"
+  ]
+}

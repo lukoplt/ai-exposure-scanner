@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "local-files": {
+      "command": "npx",
+      "args": ["some-server", "/Users/alice/Documents"],
+      "description": "Local file access only"
+    }
+  }
+}

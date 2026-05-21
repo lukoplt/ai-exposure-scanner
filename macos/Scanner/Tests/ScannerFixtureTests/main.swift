@@ -2,6 +2,7 @@ import Foundation
 import Scanner
 
 try runFixtureCorpus()
+try runEscalationEvaluatorTests()
 try runRuleUnitTests()
 try runDetectorIntegrationTests()
 try runReportBuilderTests()
@@ -27,15 +28,114 @@ private func runFixtureCorpus() throws {
             .lastPathComponent
 
         let facts = try FixtureFactBuilder.facts(from: inputURL, appId: appId)
-        let actual = RuleEvaluator()
-            .evaluate(facts)
-            .map(ComparableFinding.init)
+        let builtInFindings = RuleEvaluator().evaluate(facts)
+
+        // Parse optional rulePacks from input.json
+        let inputData = try Data(contentsOf: inputURL)
+        let inputObj = try JSONSerialization.jsonObject(with: inputData)
+        var packsForFixture: [RulePack] = []
+        if let root = inputObj as? [String: Any],
+           let yamlStrings = root["rulePacks"] as? [String] {
+            packsForFixture = yamlStrings.compactMap { yaml in
+                if case .valid(let pack) = RulePackLoader.load(yaml: yaml) { return pack }
+                return nil
+            }
+        }
+
+        let allFindings = RulePackEvaluator().evaluate(
+            facts: facts, packs: packsForFixture, existingFindings: builtInFindings)
+        let escalationRules = EscalationRules.builtIn + packsForFixture.flatMap(\.escalationRules)
+        let escalated = EscalationEvaluator().evaluate(allFindings, rules: escalationRules)
+
+        let actual = escalated.map(ComparableFinding.init)
         let expected = try ExpectedReport.load(from: expectedURL)
             .findings
             .map(ComparableFinding.init)
 
         try expect(actual == expected, "Fixture mismatch: \(relativeInput)\nactual: \(actual)\nexpected: \(expected)")
     }
+}
+
+private func runEscalationEvaluatorTests() throws {
+    let mcp003Finding = Finding(
+        ruleId: "AES-MCP-003", severity: .high, app: "claude-desktop", serverName: "fs",
+        title: "t", explanation: "e", recommendation: "r"
+    )
+    let mcp004Finding = Finding(
+        ruleId: "AES-MCP-004", severity: .high, app: "claude-desktop", serverName: "fs",
+        title: "t", explanation: "e", recommendation: "r"
+    )
+    let perServerRule = EscalationRule(
+        requiresRuleIds: ["AES-MCP-003", "AES-MCP-004"],
+        scope: .perServer,
+        escalateTo: .critical,
+        reason: "test reason"
+    )
+
+    let escalated = EscalationEvaluator().evaluate([mcp003Finding, mcp004Finding], rules: [perServerRule])
+    try expect(
+        escalated.allSatisfy { $0.severity == .critical && $0.escalationReason == "test reason" },
+        "Per-server escalation should upgrade both findings to critical with reason"
+    )
+
+    let notEscalated = EscalationEvaluator().evaluate([mcp003Finding], rules: [perServerRule])
+    try expect(
+        notEscalated.allSatisfy { $0.escalationReason == nil },
+        "Should not escalate when not all required rule IDs are present"
+    )
+
+    // Different servers — same ruleIds but on different servers, per-server should NOT fire
+    let serverAFinding = Finding(
+        ruleId: "AES-MCP-003", severity: .high, app: "claude-desktop", serverName: "server-a",
+        title: "t", explanation: "e", recommendation: "r"
+    )
+    let serverBFinding = Finding(
+        ruleId: "AES-MCP-004", severity: .high, app: "claude-desktop", serverName: "server-b",
+        title: "t", explanation: "e", recommendation: "r"
+    )
+    let splitServers = EscalationEvaluator().evaluate([serverAFinding, serverBFinding], rules: [perServerRule])
+    try expect(
+        splitServers.allSatisfy { $0.escalationReason == nil },
+        "Per-server escalation should not fire when required rules are on different servers"
+    )
+
+    // Global scope: 3 distinct servers
+    let globalRule = EscalationRule(
+        requiresRuleIds: ["AES-MCP-004"],
+        scope: .global,
+        escalateTo: .critical,
+        reason: "global test",
+        minimumDistinctServers: 3
+    )
+    let findings3Servers = (1...3).map { i in
+        Finding(
+            ruleId: "AES-MCP-004", severity: .high, app: "claude-desktop", serverName: "server-\(i)",
+            title: "t", explanation: "e", recommendation: "r"
+        )
+    }
+    let escalatedGlobal = EscalationEvaluator().evaluate(findings3Servers, rules: [globalRule])
+    try expect(
+        escalatedGlobal.allSatisfy { $0.severity == .critical },
+        "Global escalation should fire when 3+ distinct servers match"
+    )
+
+    let findings2Servers = Array(findings3Servers.dropLast())
+    let notEscalatedGlobal = EscalationEvaluator().evaluate(findings2Servers, rules: [globalRule])
+    try expect(
+        notEscalatedGlobal.allSatisfy { $0.escalationReason == nil },
+        "Global escalation should not fire with fewer than minimumDistinctServers"
+    )
+
+    // Already at target severity — no change
+    let alreadyCritical = Finding(
+        ruleId: "AES-MCP-002", severity: .critical, app: "claude-desktop", serverName: "fs",
+        title: "t", explanation: "e", recommendation: "r"
+    )
+    let noChangeResult = EscalationEvaluator().evaluate([alreadyCritical, mcp004Finding], rules: [perServerRule])
+    try expect(
+        noChangeResult.first { $0.ruleId == "AES-MCP-002" }?.escalationReason == nil,
+        "Should not add escalationReason to finding already at target severity"
+    )
 }
 
 private func runRuleUnitTests() throws {
@@ -511,6 +611,7 @@ private struct ExpectedFinding: Decodable {
     let app: String
     let serverName: String?
     let extensionId: String?
+    let escalationReason: String?
 }
 
 private struct ComparableFinding: Equatable, CustomStringConvertible {
@@ -519,6 +620,7 @@ private struct ComparableFinding: Equatable, CustomStringConvertible {
     let app: String
     let serverName: String?
     let extensionId: String?
+    let escalationReason: String?
 
     init(_ finding: Finding) {
         ruleId = finding.ruleId
@@ -526,6 +628,7 @@ private struct ComparableFinding: Equatable, CustomStringConvertible {
         app = finding.app
         serverName = finding.serverName
         extensionId = finding.extensionId
+        escalationReason = finding.escalationReason
     }
 
     init(_ finding: ExpectedFinding) {
@@ -534,9 +637,10 @@ private struct ComparableFinding: Equatable, CustomStringConvertible {
         app = finding.app
         serverName = finding.serverName
         extensionId = finding.extensionId
+        escalationReason = finding.escalationReason
     }
 
     var description: String {
-        "\(severity) \(ruleId) \(app) \(serverName ?? "nil") \(extensionId ?? "nil")"
+        "\(severity) \(ruleId) \(app) \(serverName ?? "nil") \(extensionId ?? "nil") esc=\(escalationReason ?? "nil")"
     }
 }

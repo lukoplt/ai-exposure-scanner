@@ -47,13 +47,14 @@
         "type": "object",
         "required": ["ruleId", "severity", "app", "title", "explanation", "recommendation"],
         "properties": {
-          "ruleId": { "type": "string", "pattern": "^AES-[A-Z]+-[0-9]{3}$" },
+          "ruleId": { "type": "string", "description": "Built-in rule IDs match ^AES-[A-Z]+-[0-9]{3}$; rule pack IDs may use any non-empty string not starting with AES-" },
           "severity": { "type": "string", "enum": ["critical", "high", "medium", "low"] },
           "app": { "type": "string" },
           "serverName": { "type": ["string", "null"] },
           "extensionId": { "type": ["string", "null"] },
           "affectedPath": { "type": ["string", "null"], "description": "Path to affected config file, may be shortened" },
           "maskedValue": { "type": ["string", "null"], "description": "Masked secret value if applicable" },
+          "escalationReason": { "type": ["string", "null"], "description": "Non-null when severity was upgraded by an escalation rule; explains why" },
           "title": { "type": "string" },
           "explanation": { "type": "string" },
           "recommendation": { "type": "string" }

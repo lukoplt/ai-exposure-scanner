@@ -23,6 +23,7 @@ struct AppText {
         case markdown
         case html
         case pdf
+        case json
         case settings
         case severity
         case app
@@ -80,6 +81,7 @@ struct AppText {
         case .markdown: "Markdown"
         case .html: "HTML"
         case .pdf: "PDF"
+        case .json: "JSON"
         case .settings: "Settings"
         case .severity: "Severity"
         case .app: "App"
@@ -118,6 +120,7 @@ struct AppText {
         case .markdown: "Markdown"
         case .html: "HTML"
         case .pdf: "PDF"
+        case .json: "JSON"
         case .settings: "Nastavení"
         case .severity: "Závažnost"
         case .app: "Aplikace"

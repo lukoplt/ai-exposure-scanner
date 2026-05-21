@@ -1,0 +1,13 @@
+{
+  "_type": "claude-desktop",
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-filesystem", "/Users/alice"],
+      "description": "Filesystem server"
+    }
+  },
+  "rulePacks": [
+    "version: '1.0'\nid: AES-INVALID\nname: Should be rejected\nrules: []\n"
+  ]
+}

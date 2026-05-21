@@ -1,0 +1,17 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-MCP-002",
+      "severity": "critical",
+      "app": "claude-desktop",
+      "serverName": "shell-fetch"
+    },
+    {
+      "ruleId": "AES-MCP-004",
+      "severity": "critical",
+      "app": "claude-desktop",
+      "serverName": "shell-fetch",
+      "escalationReason": "Shell execution combined with network access enables remote code execution"
+    }
+  ]
+}

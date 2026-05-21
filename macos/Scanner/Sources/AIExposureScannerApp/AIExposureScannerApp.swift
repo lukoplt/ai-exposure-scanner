@@ -101,6 +101,16 @@ final class ScanViewModel: ObservableObject {
         )
     }
 
+    func exportJson() {
+        guard let result else {
+            return
+        }
+        export(
+            content: reportBuilder.json(scanResult: result),
+            suggestedFileName: "AIExposureScanner-Report.json"
+        )
+    }
+
     func exportPdf() {
         guard let result else {
             return
@@ -251,6 +261,13 @@ struct ContentView: View {
                     viewModel.exportPdf()
                 } label: {
                     Label(viewModel.text.string(.pdf), systemImage: "doc")
+                }
+                .disabled(viewModel.result == nil)
+
+                Button {
+                    viewModel.exportJson()
+                } label: {
+                    Label(viewModel.text.string(.json), systemImage: "curlybraces")
                 }
                 .disabled(viewModel.result == nil)
 

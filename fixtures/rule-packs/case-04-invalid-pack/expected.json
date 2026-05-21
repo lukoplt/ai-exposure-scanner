@@ -1,0 +1,16 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-MCP-001",
+      "severity": "critical",
+      "app": "rule-packs",
+      "serverName": "filesystem"
+    },
+    {
+      "ruleId": "AES-MCP-007",
+      "severity": "medium",
+      "app": "rule-packs",
+      "serverName": "filesystem"
+    }
+  ]
+}

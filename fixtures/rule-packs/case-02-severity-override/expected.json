@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-MCP-007",
+      "severity": "low",
+      "app": "rule-packs",
+      "serverName": "dev-tool"
+    }
+  ]
+}

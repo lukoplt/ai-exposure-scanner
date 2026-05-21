@@ -10,13 +10,19 @@ public struct ScanOrchestrator: Sendable {
         self.evaluator = evaluator
     }
 
-    public func scan(fs: any FilesystemFacade) throws -> ScanResult {
+    public func scan(fs: any FilesystemFacade, packs: [RulePack] = []) throws -> ScanResult {
         var facts = ScanFacts()
         for detector in detectors {
             facts.append(try detector.collectFacts(fs: fs))
         }
 
-        return ScanResult(facts: facts, findings: evaluator.evaluate(facts))
+        let builtInFindings = evaluator.evaluate(facts)
+        let allFindings = RulePackEvaluator().evaluate(
+            facts: facts, packs: packs, existingFindings: builtInFindings)
+        let escalationRules = EscalationRules.builtIn + packs.flatMap(\.escalationRules)
+        let escalatedFindings = EscalationEvaluator().evaluate(allFindings, rules: escalationRules)
+
+        return ScanResult(facts: facts, findings: escalatedFindings)
     }
 
     public static let defaultDetectors: [any Detector] = [

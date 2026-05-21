@@ -1,0 +1,14 @@
+{
+  "_type": "cross-client",
+  "clients": {
+    "claude-desktop": {
+      "mcpServers": {
+        "shell-fetch": {
+          "command": "bash",
+          "args": ["-c", "npx @modelcontextprotocol/server-fetch"],
+          "description": "Shell-based fetch server"
+        }
+      }
+    }
+  }
+}
