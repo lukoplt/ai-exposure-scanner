@@ -6,6 +6,9 @@ on:
     branches:
       - main
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   drift-check:
     name: Drift check
@@ -40,9 +43,15 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"
-      - name: Build Scanner solution
-        run: dotnet build windows/AIExposureScanner.sln --configuration Release
-      - name: Build Windows desktop shell
+      - name: Restore NuGet packages
+        run: dotnet restore windows/AIExposureScanner.sln
+      - name: Build Scanner library
+        run: dotnet build windows/Scanner/Scanner.csproj --configuration Release --no-restore
+      - name: Build Scanner tests
+        run: dotnet build windows/Scanner.Tests/Scanner.Tests.csproj --configuration Release --no-restore
+      - name: Build Scanner CLI
+        run: dotnet build windows/Scanner.Cli/Scanner.Cli.csproj --configuration Release --no-restore
+      - name: Build Windows app
         run: dotnet build windows/AIExposureScanner.App/AIExposureScanner.App.csproj --configuration Release --no-restore
       - name: Run fixture corpus
         run: dotnet run --project windows/Scanner.Tests/Scanner.Tests.csproj --configuration Release --no-build
