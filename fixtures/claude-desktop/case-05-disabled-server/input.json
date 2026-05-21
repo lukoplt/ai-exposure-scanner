@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "old-server": {
+      "command": "npx",
+      "args": ["-y", "some-old-mcp-server"],
+      "disabled": true
+    }
+  }
+}

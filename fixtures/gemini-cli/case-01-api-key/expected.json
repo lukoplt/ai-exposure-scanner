@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-AUTH-001",
+      "severity": "critical",
+      "app": "gemini-cli",
+      "serverName": null
+    }
+  ]
+}

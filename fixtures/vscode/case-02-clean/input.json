@@ -1,0 +1,7 @@
+{
+  "_type": "vscode-extensions",
+  "extensions": [
+    "ms-python.python-2024.0.0",
+    "esbenp.prettier-vscode-10.1.0"
+  ]
+}

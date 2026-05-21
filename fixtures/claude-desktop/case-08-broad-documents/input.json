@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "documents": {
+      "command": "node",
+      "args": ["server.js", "/Users/testuser/Documents"],
+      "env": {},
+      "description": "Synthetic fixture for broad filesystem path detection"
+    }
+  }
+}

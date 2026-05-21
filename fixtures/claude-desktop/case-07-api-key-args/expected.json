@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-AUTH-002",
+      "severity": "critical",
+      "app": "claude-desktop",
+      "serverName": "arg-secret"
+    }
+  ]
+}

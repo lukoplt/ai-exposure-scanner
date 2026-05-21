@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-MCP-005",
+      "severity": "high",
+      "app": "cursor",
+      "serverName": "browser"
+    }
+  ]
+}

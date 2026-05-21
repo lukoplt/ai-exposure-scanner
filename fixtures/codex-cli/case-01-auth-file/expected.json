@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-AUTH-003",
+      "severity": "medium",
+      "app": "codex-cli",
+      "serverName": null
+    }
+  ]
+}

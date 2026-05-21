@@ -1,0 +1,64 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/ai-exposure-scanner/ai-exposure-scanner/spec/report-schema.json",
+  "title": "AI Exposure Scanner Report",
+  "description": "Schema for JSON export format (v0.2+). Not used in v0.1.",
+  "type": "object",
+  "required": ["schemaVersion", "scannerVersion", "scannedAt", "platform", "status", "summary", "findings"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "description": "Semantic version of this schema",
+      "example": "1.0.0"
+    },
+    "scannerVersion": {
+      "type": "string",
+      "description": "AI Exposure Scanner version that produced this report",
+      "example": "0.2.0"
+    },
+    "scannedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 UTC timestamp"
+    },
+    "platform": {
+      "type": "string",
+      "enum": ["macos", "windows"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["critical", "high", "medium", "low", "clean"]
+    },
+    "summary": {
+      "type": "object",
+      "required": ["toolsFound", "mcpServersFound", "critical", "high", "medium", "low"],
+      "properties": {
+        "toolsFound": { "type": "integer" },
+        "mcpServersFound": { "type": "integer" },
+        "critical": { "type": "integer" },
+        "high": { "type": "integer" },
+        "medium": { "type": "integer" },
+        "low": { "type": "integer" }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["ruleId", "severity", "app", "title", "explanation", "recommendation"],
+        "properties": {
+          "ruleId": { "type": "string", "pattern": "^AES-[A-Z]+-[0-9]{3}$" },
+          "severity": { "type": "string", "enum": ["critical", "high", "medium", "low"] },
+          "app": { "type": "string" },
+          "serverName": { "type": ["string", "null"] },
+          "extensionId": { "type": ["string", "null"] },
+          "affectedPath": { "type": ["string", "null"], "description": "Path to affected config file, may be shortened" },
+          "maskedValue": { "type": ["string", "null"], "description": "Masked secret value if applicable" },
+          "title": { "type": "string" },
+          "explanation": { "type": "string" },
+          "recommendation": { "type": "string" }
+        }
+      }
+    }
+  }
+}

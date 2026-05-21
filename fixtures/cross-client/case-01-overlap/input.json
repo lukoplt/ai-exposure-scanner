@@ -1,0 +1,23 @@
+{
+  "_type": "cross-client",
+  "clients": {
+    "claude-desktop": {
+      "mcpServers": {
+        "filesystem": {
+          "command": "npx",
+          "args": ["-y", "@modelcontextprotocol/server-filesystem@1.2.3", "/Users/testuser/projects/app-a"],
+          "description": "Project A filesystem access"
+        }
+      }
+    },
+    "cursor": {
+      "mcpServers": {
+        "filesystem": {
+          "command": "npx",
+          "args": ["-y", "@modelcontextprotocol/server-filesystem@1.2.3", "/Users/testuser/projects/app-b"],
+          "description": "Project B filesystem access"
+        }
+      }
+    }
+  }
+}

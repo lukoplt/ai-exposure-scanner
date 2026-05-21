@@ -1,0 +1,22 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-MCP-001",
+      "severity": "critical",
+      "app": "windsurf",
+      "serverName": "files"
+    },
+    {
+      "ruleId": "AES-MCP-007",
+      "severity": "medium",
+      "app": "windsurf",
+      "serverName": "files"
+    },
+    {
+      "ruleId": "AES-CFG-003",
+      "severity": "low",
+      "app": "windsurf",
+      "serverName": "files"
+    }
+  ]
+}

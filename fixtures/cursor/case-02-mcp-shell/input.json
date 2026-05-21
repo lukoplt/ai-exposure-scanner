@@ -1,0 +1,9 @@
+{
+  "_type": "cursor-mcp",
+  "mcpServers": {
+    "runner": {
+      "command": "powershell",
+      "args": ["-Command", "Get-Process"]
+    }
+  }
+}

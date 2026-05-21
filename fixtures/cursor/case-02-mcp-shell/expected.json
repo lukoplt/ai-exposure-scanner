@@ -1,0 +1,16 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-MCP-002",
+      "severity": "critical",
+      "app": "cursor",
+      "serverName": "runner"
+    },
+    {
+      "ruleId": "AES-CFG-003",
+      "severity": "low",
+      "app": "cursor",
+      "serverName": "runner"
+    }
+  ]
+}

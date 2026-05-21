@@ -1,0 +1,80 @@
+name: Core CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  drift-check:
+    name: Drift check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify rule implementations
+        run: python tools/drift-check/drift_check.py
+      - name: Test drift-check parser
+        run: python -B tools/drift-check/test_drift_check.py
+
+  swift-scanner:
+    name: Swift scanner
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Scanner package
+        run: swift build --package-path macos/Scanner
+      - name: Build macOS app shell
+        run: swift build --package-path macos/Scanner --product AIExposureScannerApp
+      - name: Run fixture corpus
+        run: swift run --package-path macos/Scanner ScannerFixtureTests
+
+  dotnet-scanner:
+    name: .NET scanner
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+      - name: Build Scanner solution
+        run: dotnet build windows/AIExposureScanner.sln --configuration Release
+      - name: Build Windows desktop shell
+        run: dotnet build windows/AIExposureScanner.App/AIExposureScanner.App.csproj --configuration Release --no-restore
+      - name: Run fixture corpus
+        run: dotnet run --project windows/Scanner.Tests/Scanner.Tests.csproj --configuration Release --no-build
+      - name: Check CLI help
+        run: dotnet run --project windows/Scanner.Cli/Scanner.Cli.csproj --configuration Release --no-build -- --help
+
+  privacy-grep:
+    name: Privacy grep
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Block network APIs in scanner libraries
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          roots = [Path("macos/Scanner/Sources"), Path("windows/Scanner")]
+          needles = ["URLSession", "URLRequest", "HttpClient", "HttpWebRequest", "WebClient"]
+          excluded_parts = {"bin", "obj", ".build", ".swiftpm"}
+          hits = []
+
+          for root in roots:
+              for path in root.rglob("*"):
+                  if excluded_parts.intersection(path.parts):
+                      continue
+                  if path.is_file():
+                      text = path.read_text(encoding="utf-8", errors="ignore")
+                      for needle in needles:
+                          if needle in text:
+                              hits.append(f"{path}: contains {needle}")
+
+          if hits:
+              print("\n".join(hits))
+              raise SystemExit(1)
+          PY

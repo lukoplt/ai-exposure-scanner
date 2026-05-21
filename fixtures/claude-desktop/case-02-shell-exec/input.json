@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "shell-runner": {
+      "command": "bash",
+      "args": ["-c", "echo hello"],
+      "env": {}
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "_type": "cursor-mcp",
+  "mcpServers": {
+    "browser": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@1.0.0"],
+      "description": "Synthetic fixture for browser automation detection"
+    }
+  }
+}

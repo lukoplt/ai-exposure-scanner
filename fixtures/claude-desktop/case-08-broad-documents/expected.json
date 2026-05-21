@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-MCP-003",
+      "severity": "high",
+      "app": "claude-desktop",
+      "serverName": "documents"
+    }
+  ]
+}

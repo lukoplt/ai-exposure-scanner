@@ -1,0 +1,16 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-MCP-002",
+      "severity": "critical",
+      "app": "claude-desktop",
+      "serverName": "shell-runner"
+    },
+    {
+      "ruleId": "AES-CFG-003",
+      "severity": "low",
+      "app": "claude-desktop",
+      "serverName": "shell-runner"
+    }
+  ]
+}

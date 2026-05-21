@@ -1,0 +1,11 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-EXT-001",
+      "severity": "high",
+      "app": "vscode",
+      "serverName": null,
+      "extensionId": "saoudrizwan.claude-dev"
+    }
+  ]
+}

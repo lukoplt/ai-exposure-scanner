@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-CFG-001",
+      "severity": "high",
+      "app": "cursor",
+      "serverName": null
+    }
+  ]
+}

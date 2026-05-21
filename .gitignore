@@ -1,0 +1,18 @@
+.DS_Store
+
+# Swift Package Manager
+.build/
+.swiftpm/
+macos/Scanner/.build/
+macos/Scanner/.swiftpm/
+
+# .NET
+bin/
+obj/
+**/bin/
+**/obj/
+.vs/
+
+# Editor local state
+.vscode/
+.idea/

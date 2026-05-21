@@ -1,0 +1,16 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-CFG-002",
+      "severity": "medium",
+      "app": "claude-desktop",
+      "serverName": "filesystem"
+    },
+    {
+      "ruleId": "AES-CFG-002",
+      "severity": "medium",
+      "app": "cursor",
+      "serverName": "filesystem"
+    }
+  ]
+}

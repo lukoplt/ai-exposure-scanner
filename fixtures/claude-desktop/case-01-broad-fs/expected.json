@@ -1,0 +1,22 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-MCP-001",
+      "severity": "critical",
+      "app": "claude-desktop",
+      "serverName": "filesystem"
+    },
+    {
+      "ruleId": "AES-MCP-007",
+      "severity": "medium",
+      "app": "claude-desktop",
+      "serverName": "filesystem"
+    },
+    {
+      "ruleId": "AES-CFG-003",
+      "severity": "low",
+      "app": "claude-desktop",
+      "serverName": "filesystem"
+    }
+  ]
+}

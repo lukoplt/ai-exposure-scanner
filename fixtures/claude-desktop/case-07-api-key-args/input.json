@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "arg-secret": {
+      "command": "node",
+      "args": ["server.js", "sk-proj-ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwx"],
+      "env": {},
+      "description": "Synthetic fixture for command-line secret detection"
+    }
+  }
+}
