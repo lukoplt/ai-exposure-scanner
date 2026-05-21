@@ -31,6 +31,7 @@ final class ScanViewModel: ObservableObject {
     private let orchestrator: ScanOrchestrator
     private let reportBuilder: ReportBuilder
     private let pdfExporter = PdfReportExporter()
+    let rulePackStore = RulePackStore()
 
     init(
         orchestrator: ScanOrchestrator = ScanOrchestrator(),
@@ -68,7 +69,7 @@ final class ScanViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            let scanResult = try orchestrator.scan(fs: LocalFilesystem())
+            let scanResult = try orchestrator.scan(fs: LocalFilesystem(), packs: rulePackStore.activePacks)
             result = scanResult
             summary = ReportSummary(scanResult: scanResult)
             selectedSeverity = .all
@@ -222,6 +223,68 @@ extension Finding: Identifiable {
             affectedPath ?? "",
             maskedValue ?? ""
         ].joined(separator: "|")
+    }
+}
+
+// MARK: - Rule Pack Store
+
+struct RulePackEntry: Identifiable, Codable {
+    var id = UUID()
+    var name: String
+    var yaml: String
+    var isEnabled: Bool = true
+    var isValid: Bool = true
+    var validationError: String?
+}
+
+@MainActor
+final class RulePackStore: ObservableObject {
+    @Published var entries: [RulePackEntry] = []
+
+    private let udKey = "aiexposure.rulepacks.v1"
+
+    init() { load() }
+
+    func add(yaml: String) {
+        switch RulePackLoader.load(yaml: yaml) {
+        case .valid(let pack):
+            entries.append(RulePackEntry(name: pack.name, yaml: yaml, isEnabled: true, isValid: true))
+        case .invalid(let msg):
+            entries.append(RulePackEntry(name: "Invalid pack", yaml: yaml, isEnabled: false, isValid: false, validationError: msg))
+        }
+        save()
+    }
+
+    func remove(at offsets: IndexSet) {
+        entries.remove(atOffsets: offsets)
+        save()
+    }
+
+    func toggle(_ entry: RulePackEntry) {
+        guard let i = entries.firstIndex(where: { $0.id == entry.id }), entries[i].isValid else { return }
+        entries[i].isEnabled.toggle()
+        save()
+    }
+
+    var activePacks: [RulePack] {
+        entries
+            .filter { $0.isEnabled && $0.isValid }
+            .compactMap {
+                if case .valid(let pack) = RulePackLoader.load(yaml: $0.yaml) { return pack }
+                return nil
+            }
+    }
+
+    private func save() {
+        if let data = try? JSONEncoder().encode(entries) {
+            UserDefaults.standard.set(data, forKey: udKey)
+        }
+    }
+
+    private func load() {
+        guard let data = UserDefaults.standard.data(forKey: udKey),
+              let decoded = try? JSONDecoder().decode([RulePackEntry].self, from: data) else { return }
+        entries = decoded
     }
 }
 
@@ -506,7 +569,13 @@ struct SettingsView: View {
                 }
             }
 
-            LabeledContent(viewModel.text.string(.version), value: "0.1.0")
+            Divider()
+
+            RulePacksSettingsSection(store: viewModel.rulePackStore, text: viewModel.text)
+
+            Divider()
+
+            LabeledContent(viewModel.text.string(.version), value: "0.2.0")
 
             Link(
                 viewModel.text.string(.githubReleases),
@@ -514,7 +583,7 @@ struct SettingsView: View {
             )
         }
         .padding(24)
-        .frame(width: 420)
+        .frame(width: 480)
     }
 }
 
@@ -558,5 +627,113 @@ struct SeverityBadge: View {
         case .low:
             .blue
         }
+    }
+}
+
+// MARK: - Rule Packs Settings
+
+struct RulePacksSettingsSection: View {
+    @ObservedObject var store: RulePackStore
+    let text: AppText
+    @State private var isShowingAddSheet = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text(text.string(.rulePacks))
+                    .font(.headline)
+                Spacer()
+                Button {
+                    isShowingAddSheet = true
+                } label: {
+                    Label(text.string(.addRulePack), systemImage: "plus")
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
+
+            if store.entries.isEmpty {
+                Text(text.string(.noRulePacks))
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
+            } else {
+                ForEach(store.entries) { entry in
+                    HStack {
+                        Toggle("", isOn: Binding(
+                            get: { entry.isEnabled },
+                            set: { _ in store.toggle(entry) }
+                        ))
+                        .labelsHidden()
+                        .disabled(!entry.isValid)
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(entry.name)
+                                .font(.body)
+                            if !entry.isValid, let err = entry.validationError {
+                                Text("\(text.string(.invalidPack)): \(err)")
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                                    .lineLimit(2)
+                            }
+                        }
+                        Spacer()
+                        Button(role: .destructive) {
+                            if let i = store.entries.firstIndex(where: { $0.id == entry.id }) {
+                                store.remove(at: IndexSet(integer: i))
+                            }
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .buttonStyle(.borderless)
+                        .foregroundStyle(.red)
+                    }
+                    .padding(8)
+                    .background(.quaternary, in: RoundedRectangle(cornerRadius: 6))
+                }
+            }
+        }
+        .sheet(isPresented: $isShowingAddSheet) {
+            AddRulePackSheet(text: text) { yaml in
+                store.add(yaml: yaml)
+            }
+        }
+    }
+}
+
+struct AddRulePackSheet: View {
+    let text: AppText
+    let onAdd: (String) -> Void
+    @State private var yaml = ""
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(text.string(.addRulePack))
+                .font(.title3)
+                .fontWeight(.semibold)
+            Text(text.string(.pasteYaml))
+                .foregroundStyle(.secondary)
+                .font(.caption)
+            TextEditor(text: $yaml)
+                .font(.system(.body, design: .monospaced))
+                .frame(minHeight: 200)
+                .border(.separator)
+            HStack {
+                Spacer()
+                Button(text.string(.done)) {
+                    dismiss()
+                }
+                Button(text.string(.addRulePack)) {
+                    let trimmed = yaml.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !trimmed.isEmpty else { return }
+                    onAdd(trimmed)
+                    dismiss()
+                }
+                .keyboardShortcut(.defaultAction)
+                .disabled(yaml.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .padding(24)
+        .frame(width: 520)
     }
 }

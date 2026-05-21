@@ -52,6 +52,11 @@ struct AppText {
         case githubReleases
         case couldNotSavePdf
         case couldNotSaveReport
+        case rulePacks
+        case addRulePack
+        case pasteYaml
+        case invalidPack
+        case noRulePacks
     }
 
     let language: AppLanguage
@@ -110,6 +115,11 @@ struct AppText {
         case .githubReleases: "GitHub Releases"
         case .couldNotSavePdf: "Could not save PDF report"
         case .couldNotSaveReport: "Could not save report"
+        case .rulePacks: "Rule Packs"
+        case .addRulePack: "Add Rule Pack"
+        case .pasteYaml: "Paste YAML"
+        case .invalidPack: "Invalid"
+        case .noRulePacks: "No rule packs configured."
         }
     }
 
@@ -149,6 +159,11 @@ struct AppText {
         case .githubReleases: "GitHub vydání"
         case .couldNotSavePdf: "PDF report se nepodařilo uložit"
         case .couldNotSaveReport: "Report se nepodařilo uložit"
+        case .rulePacks: "Balíčky pravidel"
+        case .addRulePack: "Přidat balíček"
+        case .pasteYaml: "Vložit YAML"
+        case .invalidPack: "Neplatný"
+        case .noRulePacks: "Žádné balíčky pravidel."
         }
     }
 }

@@ -6,20 +6,20 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-05-21
+
 ### Added
-- Product documentation, rule catalog, detector specs, report schema, and security policy
-- Initial macOS Swift Scanner package and Windows C# Scanner library
-- 15 native rule evaluators covering MCP filesystem access, shell execution, network access, plaintext credentials, extension risk, and config hygiene
-- Local filesystem abstraction, known-path detectors, and scan orchestrators for Swift and .NET
-- Report summary, Markdown report builder, and self-contained HTML report builder in Swift and .NET
-- macOS SwiftUI app shell wired to scan, filters, details, config-file opening, settings, and Markdown/HTML/PDF export
-- Windows desktop shell wired to scan, filters, details, config-file opening, and Markdown/HTML/PDF export
-- .NET CLI exporter for Markdown/HTML/PDF reports
-- App-installation facts for known tools and orphaned MCP config detection
-- macOS release plist/entitlements plus macOS and Windows release workflows
-- Feature mapping document for callable product surfaces
-- Cross-platform fixture corpus and executable fixture runners for Swift and .NET
-- Drift-check tooling and Core CI workflow
+- **Context-aware escalation scoring**: `EscalationEvaluator` post-processes findings after rule evaluation to upgrade severities for dangerous rule combinations. 8 built-in escalation rules covering per-server and global cross-server risks. `escalationReason` field on `Finding` surfaces the reason in UI and exports.
+- **YAML rule packs**: Organizations can define custom detection rules, severity overrides for built-in rules, and custom escalation rules via YAML files. Full validation with descriptive error messages. Persistence via UserDefaults (macOS) and `%LOCALAPPDATA%\AIExposureScanner\rule-packs.json` (Windows).
+- **JSON export**: `ReportBuilder.json()` on both platforms emitting reports conforming to `spec/report-schema.json`. `--format json` added to Windows CLI. JSON export buttons added to macOS and Windows apps.
+- Rule Packs management UI in macOS Settings sheet (paste YAML, enable/disable, remove packs).
+- Rule Packs management window in Windows app toolbar (paste YAML, remove packs).
+- 8 new fixture cases covering escalation scenarios and rule pack features.
+- Yams 5.x (Swift) and YamlDotNet 17.x (C#) YAML parsing dependencies.
+
+### Changed
+- `spec/report-schema.json`: relaxed `ruleId` pattern to allow custom rule pack IDs; added `escalationReason` field to finding schema.
+- Version bumped to 0.2.0 in app UIs.
 
 ## [0.1.0] — 2026-05-21
 

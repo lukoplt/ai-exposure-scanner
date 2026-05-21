@@ -1,5 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.IO;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -7,6 +9,7 @@ using AIExposureScanner.Scanner;
 using AIExposureScanner.Scanner.Filesystem;
 using AIExposureScanner.Scanner.Models;
 using AIExposureScanner.Scanner.Reporting;
+using AIExposureScanner.Scanner.RulePacks;
 using Microsoft.Win32;
 
 namespace AIExposureScanner.App;
@@ -24,10 +27,199 @@ public static class Program
     }
 }
 
+// MARK: - Rule Pack Store
+
+public sealed class RulePackEntry
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Name { get; set; } = "";
+    public string Yaml { get; set; } = "";
+    public bool IsEnabled { get; set; } = true;
+    public bool IsValid { get; set; } = true;
+    public string? ValidationError { get; set; }
+}
+
+public sealed class WinRulePackStore
+{
+    private static readonly string StorePath = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "AIExposureScanner", "rule-packs.json");
+
+    public ObservableCollection<RulePackEntry> Entries { get; } = [];
+
+    public WinRulePackStore() { Load(); }
+
+    public void Add(string yaml)
+    {
+        var result = RulePackLoader.Load(yaml);
+        var entry = result switch
+        {
+            RulePackLoadResult.Valid v => new RulePackEntry { Name = v.Pack.Name, Yaml = yaml },
+            RulePackLoadResult.Invalid e => new RulePackEntry { Name = "Invalid pack", Yaml = yaml, IsEnabled = false, IsValid = false, ValidationError = e.Error },
+            _ => throw new UnreachableException()
+        };
+        Entries.Add(entry);
+        Save();
+    }
+
+    public void Remove(RulePackEntry entry) { Entries.Remove(entry); Save(); }
+
+    public IReadOnlyList<RulePack> ActivePacks =>
+        Entries
+            .Where(e => e.IsEnabled && e.IsValid)
+            .Select(e => RulePackLoader.Load(e.Yaml))
+            .OfType<RulePackLoadResult.Valid>()
+            .Select(v => v.Pack)
+            .ToList();
+
+    private void Save()
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(StorePath)!);
+            File.WriteAllText(StorePath, JsonSerializer.Serialize(Entries.ToList()));
+        }
+        catch { /* best effort */ }
+    }
+
+    private void Load()
+    {
+        try
+        {
+            if (!File.Exists(StorePath)) return;
+            var list = JsonSerializer.Deserialize<List<RulePackEntry>>(File.ReadAllText(StorePath));
+            if (list is null) return;
+            foreach (var e in list) Entries.Add(e);
+        }
+        catch { /* best effort */ }
+    }
+}
+
+// MARK: - Rule Packs Window
+
+public sealed class RulePacksWindow : Window
+{
+    private readonly WinRulePackStore _store;
+    private readonly ListBox _listBox = new() { Margin = new Thickness(0, 0, 0, 8) };
+
+    public RulePacksWindow(WinRulePackStore store)
+    {
+        _store = store;
+        Title = "Rule Packs";
+        Width = 540;
+        Height = 480;
+        ResizeMode = ResizeMode.NoResize;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+
+        _listBox.ItemsSource = store.Entries;
+        _listBox.ItemTemplate = BuildEntryTemplate();
+
+        var addButton = new Button { Content = "+ Add Rule Pack", Padding = new Thickness(12, 5, 12, 5) };
+        addButton.Click += (_, _) => ShowAddDialog();
+
+        var closeButton = new Button { Content = "Close", Padding = new Thickness(12, 5, 12, 5) };
+        closeButton.Click += (_, _) => Close();
+
+        var buttonRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        buttonRow.Children.Add(addButton);
+        buttonRow.Children.Add(new UIElement[] { }.Length == 0 ? new Separator { Width = 8, Visibility = Visibility.Hidden } : new Separator());
+        buttonRow.Children.Add(closeButton);
+
+        var root = new DockPanel { Margin = new Thickness(16) };
+        DockPanel.SetDock(buttonRow, Dock.Bottom);
+        root.Children.Add(buttonRow);
+        root.Children.Add(_listBox);
+        Content = root;
+    }
+
+    private DataTemplate BuildEntryTemplate()
+    {
+        var factory = new FrameworkElementFactory(typeof(Border));
+        factory.SetValue(Border.PaddingProperty, new Thickness(8, 6, 8, 6));
+        factory.SetValue(Border.MarginProperty, new Thickness(0, 0, 0, 4));
+        factory.SetValue(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(247, 247, 247)));
+        factory.SetValue(Border.CornerRadiusProperty, new CornerRadius(4));
+
+        var row = new FrameworkElementFactory(typeof(DockPanel));
+
+        var deleteBtn = new FrameworkElementFactory(typeof(Button));
+        deleteBtn.SetValue(Button.ContentProperty, "✕");
+        deleteBtn.SetValue(Button.PaddingProperty, new Thickness(6, 2, 6, 2));
+        deleteBtn.SetValue(DockPanel.DockProperty, Dock.Right);
+        deleteBtn.AddHandler(Button.ClickEvent, new RoutedEventHandler((s, _) =>
+        {
+            if (s is FrameworkElement fe && fe.DataContext is RulePackEntry entry)
+                _store.Remove(entry);
+        }));
+
+        var nameBlock = new FrameworkElementFactory(typeof(TextBlock));
+        nameBlock.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding("Name"));
+        nameBlock.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
+
+        row.AppendChild(deleteBtn);
+        row.AppendChild(nameBlock);
+        factory.AppendChild(row);
+
+        return new DataTemplate { VisualTree = factory };
+    }
+
+    private void ShowAddDialog()
+    {
+        var dialog = new Window
+        {
+            Title = "Add Rule Pack",
+            Width = 540,
+            Height = 400,
+            ResizeMode = ResizeMode.NoResize,
+            Owner = this,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner
+        };
+
+        var editor = new TextBox
+        {
+            AcceptsReturn = true,
+            TextWrapping = TextWrapping.Wrap,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            FontFamily = new FontFamily("Consolas"),
+            Margin = new Thickness(0, 0, 0, 8)
+        };
+        var hint = new TextBlock
+        {
+            Text = "Paste YAML rule pack content:",
+            Margin = new Thickness(0, 0, 0, 4)
+        };
+        var addBtn = new Button { Content = "Add", Padding = new Thickness(12, 5, 12, 5), IsDefault = true };
+        var cancelBtn = new Button { Content = "Cancel", Padding = new Thickness(12, 5, 12, 5), Margin = new Thickness(8, 0, 0, 0), IsCancel = true };
+
+        addBtn.Click += (_, _) =>
+        {
+            var yaml = editor.Text.Trim();
+            if (string.IsNullOrWhiteSpace(yaml)) return;
+            _store.Add(yaml);
+            dialog.Close();
+        };
+        cancelBtn.Click += (_, _) => dialog.Close();
+
+        var btnRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        btnRow.Children.Add(addBtn);
+        btnRow.Children.Add(cancelBtn);
+
+        var stack = new DockPanel { Margin = new Thickness(16) };
+        DockPanel.SetDock(btnRow, Dock.Bottom);
+        DockPanel.SetDock(hint, Dock.Top);
+        stack.Children.Add(btnRow);
+        stack.Children.Add(hint);
+        stack.Children.Add(editor);
+        dialog.Content = stack;
+        dialog.ShowDialog();
+    }
+}
+
 public sealed class MainWindow : Window
 {
     private readonly ScanOrchestrator _orchestrator = new();
     private readonly ReportBuilder _reportBuilder = new();
+    private readonly WinRulePackStore _rulePackStore = new();
     private readonly ObservableCollection<FindingListItem> _visibleFindings = [];
 
     private ScanResult? _result;
@@ -121,6 +313,19 @@ public sealed class MainWindow : Window
         _exportJsonButton.Margin = new Thickness(8, 0, 0, 0);
         _exportJsonButton.Click += (_, _) => Export("AIExposureScanner-Report.json", "JSON report (*.json)|*.json", r => _reportBuilder.Json(r));
         panel.Children.Add(_exportJsonButton);
+
+        var rulePacksButton = new Button
+        {
+            Content = "Rule Packs",
+            Margin = new Thickness(16, 0, 0, 0),
+            Padding = new Thickness(12, 5, 12, 5)
+        };
+        rulePacksButton.Click += (_, _) =>
+        {
+            var win = new RulePacksWindow(_rulePackStore) { Owner = this };
+            win.ShowDialog();
+        };
+        panel.Children.Add(rulePacksButton);
 
         UpdateExportButtons();
         return panel;
@@ -219,7 +424,7 @@ public sealed class MainWindow : Window
     {
         try
         {
-            _result = await _orchestrator.ScanAsync(new LocalFilesystem());
+            _result = await _orchestrator.ScanAsync(new LocalFilesystem(), packs: _rulePackStore.ActivePacks);
             RefreshSummary();
             RefreshAppFilter();
             RefreshVisibleFindings();
