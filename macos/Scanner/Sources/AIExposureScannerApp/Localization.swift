@@ -58,6 +58,7 @@ struct AppText {
         case invalidPack
         case noRulePacks
         case detectedTools
+        case support
     }
 
     let language: AppLanguage
@@ -122,6 +123,7 @@ struct AppText {
         case .invalidPack: "Invalid"
         case .noRulePacks: "No rule packs configured."
         case .detectedTools: "Detected tools"
+        case .support: "Support"
         }
     }
 
@@ -167,6 +169,7 @@ struct AppText {
         case .invalidPack: "Neplatný"
         case .noRulePacks: "Žádné balíčky pravidel."
         case .detectedTools: "Detekované nástroje"
+        case .support: "Podpořit"
         }
     }
 }

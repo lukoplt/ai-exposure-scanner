@@ -658,8 +658,22 @@ struct SettingsView: View {
 
             Link(
                 viewModel.text.string(.githubReleases),
-                destination: URL(string: "https://github.com/ai-exposure-scanner/ai-exposure-scanner/releases")!
+                destination: URL(string: "https://github.com/tsechis/ai-exposure-scanner/releases")!
             )
+
+            HStack(spacing: 4) {
+                Text("Made with ❤️ by Lukáš Oplt")
+                    .foregroundStyle(.secondary)
+                Text("(")
+                    .foregroundStyle(.secondary)
+                Link(
+                    viewModel.text.string(.support),
+                    destination: URL(string: "https://lukasoplt.gumroad.com/coffee")!
+                )
+                Text(")")
+                    .foregroundStyle(.secondary)
+            }
+            .font(.footnote)
         }
         .padding(24)
         .frame(width: 480)
