@@ -433,40 +433,39 @@ internal sealed class InMemoryFilesystem : IFilesystemFacade
         HomeDirectory = homeDirectory;
         ApplicationDataDirectory = applicationDataDirectory;
         LocalApplicationDataDirectory = localApplicationDataDirectory;
-        _files = files;
-        _directories = new HashSet<string>(directories.Select(NormalizeDirectory), StringComparer.Ordinal);
+        // Normalize all paths to forward slashes for cross-platform consistency
+        _files = files.ToDictionary(kv => Normalize(kv.Key), kv => kv.Value, StringComparer.Ordinal);
+        _directories = new HashSet<string>(directories.Select(Normalize), StringComparer.Ordinal);
     }
 
     public string HomeDirectory { get; }
     public string ApplicationDataDirectory { get; }
     public string LocalApplicationDataDirectory { get; }
 
-    public bool FileExists(string path) => _files.ContainsKey(path);
+    public bool FileExists(string path) => _files.ContainsKey(Normalize(path));
 
-    public bool DirectoryExists(string path) => AllDirectories().Contains(NormalizeDirectory(path));
+    public bool DirectoryExists(string path) => AllDirectories().Contains(Normalize(path));
 
     public string ReadTextFile(string path, int maxBytes = 10 * 1024 * 1024) =>
-        _files.TryGetValue(path, out var file)
+        _files.TryGetValue(Normalize(path), out var file)
             ? file.Text
             : throw new InvalidOperationException($"Missing in-memory file: {path}");
 
     public IReadOnlyList<string> ListDirectoryNames(string path)
     {
-        var directory = NormalizeDirectory(path);
+        var directory = Normalize(path);
         var names = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var candidate in AllDirectories().Where(candidate => candidate.StartsWith(directory + Path.DirectorySeparatorChar, StringComparison.Ordinal)))
+        foreach (var candidate in AllDirectories().Where(c => c.StartsWith(directory + "/", StringComparison.Ordinal)))
         {
             var remainder = candidate[(directory.Length + 1)..];
-            var first = remainder.Split(Path.DirectorySeparatorChar, 2)[0];
-            names.Add(first);
+            names.Add(remainder.Split('/', 2)[0]);
         }
 
-        foreach (var filePath in _files.Keys.Where(filePath => filePath.StartsWith(directory + Path.DirectorySeparatorChar, StringComparison.Ordinal)))
+        foreach (var filePath in _files.Keys.Where(f => f.StartsWith(directory + "/", StringComparison.Ordinal)))
         {
             var remainder = filePath[(directory.Length + 1)..];
-            var first = remainder.Split(Path.DirectorySeparatorChar, 2)[0];
-            names.Add(first);
+            names.Add(remainder.Split('/', 2)[0]);
         }
 
         return names.Order(StringComparer.Ordinal).ToArray();
@@ -474,63 +473,54 @@ internal sealed class InMemoryFilesystem : IFilesystemFacade
 
     public IReadOnlyList<string> ListFilesRecursively(string path, int maxDepth)
     {
-        var root = NormalizeDirectory(path);
+        var root = Normalize(path);
         return _files.Keys
-            .Where(filePath => filePath.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.Ordinal))
-            .Where(filePath =>
-            {
-                var remainder = filePath[(root.Length + 1)..];
-                return remainder.Split(Path.DirectorySeparatorChar).Length <= maxDepth + 1;
-            })
+            .Where(f => f.StartsWith(root + "/", StringComparison.Ordinal))
+            .Where(f => f[(root.Length + 1)..].Split('/').Length <= maxDepth + 1)
             .Order(StringComparer.Ordinal)
             .ToArray();
     }
 
     public bool IsWorldReadableFile(string path) =>
-        _files.TryGetValue(path, out var file) && file.WorldReadable;
+        _files.TryGetValue(Normalize(path), out var file) && file.WorldReadable;
 
     private HashSet<string> AllDirectories()
     {
         var result = new HashSet<string>(_directories, StringComparer.Ordinal)
         {
-            HomeDirectory,
-            ApplicationDataDirectory,
-            LocalApplicationDataDirectory
+            Normalize(HomeDirectory),
+            Normalize(ApplicationDataDirectory),
+            Normalize(LocalApplicationDataDirectory)
         };
 
         foreach (var directory in _directories)
-        {
             InsertParentDirectories(directory, result, isFile: false);
-        }
 
         foreach (var filePath in _files.Keys)
-        {
             InsertParentDirectories(filePath, result, isFile: true);
-        }
 
         return result;
     }
 
-    private static void InsertParentDirectories(string path, HashSet<string> result, bool isFile)
+    private static void InsertParentDirectories(string normalizedPath, HashSet<string> result, bool isFile)
     {
-        var parts = NormalizeDirectory(path).Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries).ToList();
+        var parts = normalizedPath.Split('/', StringSplitOptions.RemoveEmptyEntries).ToList();
         if (isFile && parts.Count > 0)
-        {
             parts.RemoveAt(parts.Count - 1);
-        }
 
-        var current = Path.DirectorySeparatorChar.ToString();
+        // Preserve leading slash for Unix-style absolute paths
+        var prefix = normalizedPath.StartsWith('/') ? "/" : string.Empty;
+        var current = prefix;
         foreach (var part in parts)
         {
-            current = current == Path.DirectorySeparatorChar.ToString()
-                ? current + part
-                : Path.Combine(current, part);
+            current = current is "" or "/" ? prefix + part : current + "/" + part;
             result.Add(current);
         }
     }
 
-    private static string NormalizeDirectory(string path) =>
-        path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+    // Normalize to forward slashes and strip trailing slash (cross-platform)
+    private static string Normalize(string path) =>
+        path.Replace('\\', '/').TrimEnd('/');
 }
 
 internal static class FixtureFactBuilder
