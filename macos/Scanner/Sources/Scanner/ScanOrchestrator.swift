@@ -31,6 +31,7 @@ public struct ScanOrchestrator: Sendable {
         WindsurfDetector(),
         VSCodeDetector(),
         CodexCliDetector(),
-        GeminiCliDetector()
+        GeminiCliDetector(),
+        ClaudeCliDetector()
     ]
 }

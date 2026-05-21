@@ -66,6 +66,7 @@ public sealed class ScanOrchestrator
         new WindsurfDetector(),
         new VSCodeDetector(),
         new CodexCliDetector(),
-        new GeminiCliDetector()
+        new GeminiCliDetector(),
+        new ClaudeCliDetector()
     ];
 }

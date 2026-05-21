@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "safe-server": {
+      "command": "/usr/local/bin/my-mcp-server",
+      "args": ["--port", "3000"],
+      "env": {},
+      "description": "Internal project MCP server"
+    }
+  }
+}

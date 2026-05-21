@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "files": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/Users/alice"],
+      "env": {}
+    }
+  }
+}
