@@ -13,6 +13,7 @@ try
     RunRuleUnitTests();
     RunDetectorIntegrationTests();
     RunReportBuilderTests();
+    RunRulePackLoaderTests();
     Console.WriteLine("Scanner.Tests passed");
 }
 catch (Exception ex)
@@ -299,6 +300,95 @@ static void RunReportBuilderTests()
     Expect(!html.Contains(secret, StringComparison.Ordinal), "HTML report must not include full secret");
     Expect(pdf.Length > 8 && pdf[0] == (byte)'%' && pdf[1] == (byte)'P' && pdf[2] == (byte)'D' && pdf[3] == (byte)'F', "PDF report should include PDF header");
     Expect(!System.Text.Encoding.ASCII.GetString(pdf).Contains(secret, StringComparison.Ordinal), "PDF report must not include full secret");
+
+    var json = builder.Json(result, scannedAt: DateTimeOffset.UnixEpoch);
+    using var doc = JsonDocument.Parse(json);
+    var root = doc.RootElement;
+    Expect(root.GetProperty("schemaVersion").GetString() == "1.0.0", "JSON report should include schemaVersion");
+    Expect(root.GetProperty("platform").GetString() == "windows", "JSON report should include platform");
+    var jsonFindings = root.GetProperty("findings").EnumerateArray().ToList();
+    Expect(jsonFindings.Any(f => f.GetProperty("ruleId").GetString() == "AES-AUTH-002"), "JSON report should include finding ruleId");
+    Expect(!json.Contains(secret, StringComparison.Ordinal), "JSON report must not include full secret");
+}
+
+static void RunRulePackLoaderTests()
+{
+    // Valid minimal pack
+    var validYaml = "version: '1.0'\nid: test-pack\nname: Test Pack\n";
+    Expect(RulePackLoader.Load(validYaml) is RulePackLoadResult.Valid, "Valid minimal pack should load");
+
+    // Reserved AES- id
+    var reservedYaml = "version: '1.0'\nid: AES-CUSTOM\nname: Bad Pack\n";
+    Expect(RulePackLoader.Load(reservedYaml) is RulePackLoadResult.Invalid, "Pack with AES- id should be rejected");
+
+    // Missing version
+    Expect(RulePackLoader.Load("id: test-pack\nname: X\n") is RulePackLoadResult.Invalid, "Pack missing version should be rejected");
+
+    // Custom rule with valid match
+    var packWithRule = """
+        version: "1.0"
+        id: my-org-rules
+        name: My Org Rules
+        rules:
+          - id: MY-001
+            severity: high
+            title: Custom Rule
+            explanation: Test
+            recommendation: Fix it
+            match:
+              fact: mcp_server
+              name_contains: suspicious
+        """;
+    var ruleResult = RulePackLoader.Load(packWithRule);
+    Expect(ruleResult is RulePackLoadResult.Valid, "Pack with valid rule should load");
+    if (ruleResult is RulePackLoadResult.Valid rv)
+    {
+        Expect(rv.Pack.Rules.Count == 1, "Pack should have 1 rule");
+        Expect(rv.Pack.Rules[0].Id == "MY-001", "Rule id should be MY-001");
+        Expect(rv.Pack.Rules[0].Severity.Equals("high", StringComparison.OrdinalIgnoreCase), "Rule severity should be high");
+    }
+
+    // Rule with AES- id rejected
+    var badRuleYaml = """
+        version: "1.0"
+        id: org-rules
+        name: Org
+        rules:
+          - id: AES-MCP-001
+            severity: low
+            title: Bad
+            explanation: X
+            recommendation: X
+            match:
+              fact: mcp_server
+        """;
+    Expect(RulePackLoader.Load(badRuleYaml) is RulePackLoadResult.Invalid, "Rule with AES- id should be rejected");
+
+    // Override + escalation parsed and escalationRules computed
+    var fullPack = """
+        version: "1.0"
+        id: full-pack
+        name: Full Pack
+        overrides:
+          - id: AES-MCP-007
+            severity: low
+        escalations:
+          - requires:
+              - AES-MCP-003
+              - AES-MCP-004
+            scope: per_server
+            escalate_to: critical
+            reason: Test escalation
+        """;
+    var fullResult = RulePackLoader.Load(fullPack);
+    Expect(fullResult is RulePackLoadResult.Valid, "Full pack should load");
+    if (fullResult is RulePackLoadResult.Valid fv)
+    {
+        Expect(fv.Pack.Overrides.Count == 1, "Pack should have 1 override");
+        Expect(fv.Pack.Escalations.Count == 1, "Pack should have 1 escalation");
+        Expect(fv.Pack.EscalationRules.Count == 1, "Pack escalationRules should have 1 entry");
+        Expect(fv.Pack.EscalationRules[0].EscalateTo == Severity.Critical, "Escalation target should be critical");
+    }
 }
 
 static string FindRepoRoot()

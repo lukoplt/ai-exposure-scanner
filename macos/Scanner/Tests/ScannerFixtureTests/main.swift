@@ -6,6 +6,7 @@ try runEscalationEvaluatorTests()
 try runRuleUnitTests()
 try runDetectorIntegrationTests()
 try runReportBuilderTests()
+try runRulePackLoaderTests()
 print("ScannerFixtureTests passed")
 
 private func runFixtureCorpus() throws {
@@ -338,6 +339,110 @@ private func runReportBuilderTests() throws {
     try expect(html.contains("AES-AUTH-002"), "HTML report should include rule ID")
     try expect(html.contains("************"), "HTML report should include masked secret preview")
     try expect(!html.contains(secret), "HTML report must not include full secret")
+
+    let json = builder.json(scanResult: result, scannedAt: Date(timeIntervalSince1970: 0))
+    let jsonData = json.data(using: .utf8)!
+    let decoded = try JSONSerialization.jsonObject(with: jsonData) as! [String: Any]
+    try expect(decoded["schemaVersion"] as? String == "1.0.0", "JSON report should include schemaVersion")
+    try expect(decoded["platform"] as? String == "macos", "JSON report should include platform")
+    let findings = decoded["findings"] as! [[String: Any]]
+    try expect(findings.contains { $0["ruleId"] as? String == "AES-AUTH-002" }, "JSON report should include finding ruleId")
+    try expect(!json.contains(secret), "JSON report must not include full secret")
+}
+
+private func runRulePackLoaderTests() throws {
+    // Valid minimal pack
+    let validYaml = """
+        version: "1.0"
+        id: test-pack
+        name: Test Pack
+        """
+    if case .invalid(let msg) = RulePackLoader.load(yaml: validYaml) {
+        throw TestFailure("Valid minimal pack rejected: \(msg)")
+    }
+
+    // Reserved AES- id
+    let reservedYaml = """
+        version: "1.0"
+        id: AES-CUSTOM
+        name: Bad Pack
+        """
+    guard case .invalid = RulePackLoader.load(yaml: reservedYaml) else {
+        throw TestFailure("Pack with AES- id should be rejected")
+    }
+
+    // Missing version
+    guard case .invalid = RulePackLoader.load(yaml: "id: test-pack\nname: X") else {
+        throw TestFailure("Pack missing version should be rejected")
+    }
+
+    // Custom rule with valid match
+    let packWithRule = """
+        version: "1.0"
+        id: my-org-rules
+        name: My Org Rules
+        rules:
+          - id: MY-001
+            severity: high
+            title: Custom Rule
+            explanation: Test
+            recommendation: Fix it
+            match:
+              fact: mcp_server
+              name_contains: suspicious
+        """
+    switch RulePackLoader.load(yaml: packWithRule) {
+    case .valid(let pack):
+        try expect(pack.rules.count == 1, "Pack should have 1 rule")
+        try expect(pack.rules[0].id == "MY-001", "Rule id should be MY-001")
+        try expect(pack.rules[0].severity == .high, "Rule severity should be high")
+    case .invalid(let msg):
+        throw TestFailure("Valid pack with rule rejected: \(msg)")
+    }
+
+    // Rule with AES- id rejected
+    let badRuleYaml = """
+        version: "1.0"
+        id: org-rules
+        name: Org
+        rules:
+          - id: AES-MCP-001
+            severity: low
+            title: Bad
+            explanation: X
+            recommendation: X
+            match:
+              fact: mcp_server
+        """
+    guard case .invalid = RulePackLoader.load(yaml: badRuleYaml) else {
+        throw TestFailure("Rule with AES- id should be rejected")
+    }
+
+    // Override + escalation parsed correctly
+    let fullPack = """
+        version: "1.0"
+        id: full-pack
+        name: Full Pack
+        overrides:
+          - id: AES-MCP-007
+            severity: low
+        escalations:
+          - requires:
+              - AES-MCP-003
+              - AES-MCP-004
+            scope: per_server
+            escalate_to: critical
+            reason: Test escalation
+        """
+    switch RulePackLoader.load(yaml: fullPack) {
+    case .valid(let pack):
+        try expect(pack.overrides.count == 1, "Pack should have 1 override")
+        try expect(pack.escalations.count == 1, "Pack should have 1 escalation")
+        try expect(pack.escalationRules.count == 1, "Pack escalationRules should have 1 entry")
+        try expect(pack.escalationRules[0].escalateTo == .critical, "Escalation target should be critical")
+    case .invalid(let msg):
+        throw TestFailure("Full pack rejected: \(msg)")
+    }
 }
 
 private func repoRoot() -> URL {
