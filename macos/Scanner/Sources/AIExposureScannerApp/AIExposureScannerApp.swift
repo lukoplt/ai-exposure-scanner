@@ -399,7 +399,7 @@ struct Sidebar: View {
 
             List(selection: $viewModel.selectedFindingId) {
                 ForEach(viewModel.filteredFindings) { finding in
-                    FindingRow(finding: finding)
+                    FindingRow(finding: finding, text: viewModel.text)
                         .tag(finding.id)
                 }
             }
@@ -563,6 +563,7 @@ struct Metric: View {
 
 struct FindingRow: View {
     let finding: Finding
+    let text: AppText
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -572,7 +573,7 @@ struct FindingRow: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Text(finding.title)
+            Text(text.ruleText(for: finding.ruleId).title)
                 .font(.callout)
                 .lineLimit(2)
             Text([finding.app, finding.serverName, finding.extensionId].compactMap { $0 }.joined(separator: " · "))
@@ -598,7 +599,7 @@ struct DetailPane: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    Text(finding.title)
+                    Text(viewModel.text.ruleText(for: finding.ruleId).title)
                         .font(.title2)
                         .fontWeight(.semibold)
 
@@ -611,13 +612,13 @@ struct DetailPane: View {
                     }
 
                     GroupBox(viewModel.text.string(.whyThisMatters)) {
-                        Text(finding.explanation)
+                        Text(viewModel.text.ruleText(for: finding.ruleId).explanation)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .textSelection(.enabled)
                     }
 
                     GroupBox(viewModel.text.string(.recommendedFix)) {
-                        Text(finding.recommendation)
+                        Text(viewModel.text.ruleText(for: finding.ruleId).recommendation)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .textSelection(.enabled)
                     }
