@@ -123,7 +123,7 @@ internal static class RuleExtensions
         new[] { server.Command }.Concat(server.Args).Concat(server.Env.Values);
 }
 
-internal static partial class SecretPatterns
+public static partial class SecretPatterns
 {
     private static readonly Regex[] Expressions =
     [
@@ -138,8 +138,26 @@ internal static partial class SecretPatterns
     public static bool ContainsSecret(string value) =>
         Expressions.Any(expression => expression.IsMatch(value));
 
-    public static string Masked(string value) =>
-        value[..Math.Min(12, value.Length)] + "************";
+    /// <summary>
+    /// Returns a masked representation that reveals only the schema prefix
+    /// (e.g. "sk-ant-", "AIza", "ghp_") and replaces all entropy characters
+    /// with bullets. Never leaks any bytes of the secret material itself.
+    /// </summary>
+    public static string Masked(string value)
+    {
+        // Most-specific prefixes first so we never match "sk-" before "sk-ant-".
+        string[] knownPrefixes = ["sk-ant-", "sk-proj-", "github_pat_", "ghp_", "AIza", "sk-"];
+        foreach (var prefix in knownPrefixes)
+        {
+            var idx = value.IndexOf(prefix, StringComparison.Ordinal);
+            if (idx >= 0)
+            {
+                var before = value[..idx];
+                return before + prefix + new string('•', 24);
+            }
+        }
+        return new string('•', Math.Min(value.Length, 16));
+    }
 
     [GeneratedRegex(@"sk-ant-[a-zA-Z0-9\-_]{80,}")]
     private static partial Regex AnthropicRegex();

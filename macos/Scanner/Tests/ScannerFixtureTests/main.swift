@@ -333,12 +333,16 @@ private func runReportBuilderTests() throws {
 
     try expect(markdown.contains("# AI Exposure Scanner Report"), "Markdown report should include title")
     try expect(markdown.contains("AES-AUTH-002"), "Markdown report should include rule ID")
-    try expect(markdown.contains("************"), "Markdown report should include masked secret preview")
+    try expect(markdown.contains("sk-proj-"), "Markdown report should include masked secret schema prefix")
+    try expect(markdown.contains("•"), "Markdown report should include bullet-masked secret")
     try expect(!markdown.contains(secret), "Markdown report must not include full secret")
+    try expect(!markdown.contains("ABCDEFGH"), "Markdown report must not leak entropy chars")
     try expect(html.contains("<!doctype html>"), "HTML report should include document wrapper")
     try expect(html.contains("AES-AUTH-002"), "HTML report should include rule ID")
-    try expect(html.contains("************"), "HTML report should include masked secret preview")
+    try expect(html.contains("sk-proj-"), "HTML report should include masked secret schema prefix")
+    try expect(html.contains("•"), "HTML report should include bullet-masked secret")
     try expect(!html.contains(secret), "HTML report must not include full secret")
+    try expect(!html.contains("ABCDEFGH"), "HTML report must not leak entropy chars")
 
     let json = builder.json(scanResult: result, scannedAt: Date(timeIntervalSince1970: 0))
     let jsonData = json.data(using: .utf8)!

@@ -292,12 +292,16 @@ static void RunReportBuilderTests()
 
     Expect(markdown.Contains("# AI Exposure Scanner Report", StringComparison.Ordinal), "Markdown report should include title");
     Expect(markdown.Contains("AES-AUTH-002", StringComparison.Ordinal), "Markdown report should include rule ID");
-    Expect(markdown.Contains("************", StringComparison.Ordinal), "Markdown report should include masked secret preview");
+    Expect(markdown.Contains("sk-proj-", StringComparison.Ordinal), "Markdown report should include masked secret schema prefix");
+    Expect(markdown.Contains("•", StringComparison.Ordinal), "Markdown report should include bullet-masked secret");
     Expect(!markdown.Contains(secret, StringComparison.Ordinal), "Markdown report must not include full secret");
+    Expect(!markdown.Contains("ABCDEFGH", StringComparison.Ordinal), "Markdown report must not leak entropy chars");
     Expect(html.Contains("<!doctype html>", StringComparison.Ordinal), "HTML report should include document wrapper");
     Expect(html.Contains("AES-AUTH-002", StringComparison.Ordinal), "HTML report should include rule ID");
-    Expect(html.Contains("************", StringComparison.Ordinal), "HTML report should include masked secret preview");
+    Expect(html.Contains("sk-proj-", StringComparison.Ordinal), "HTML report should include masked secret schema prefix");
+    Expect(html.Contains("•", StringComparison.Ordinal), "HTML report should include bullet-masked secret");
     Expect(!html.Contains(secret, StringComparison.Ordinal), "HTML report must not include full secret");
+    Expect(!html.Contains("ABCDEFGH", StringComparison.Ordinal), "HTML report must not leak entropy chars");
     Expect(pdf.Length > 8 && pdf[0] == (byte)'%' && pdf[1] == (byte)'P' && pdf[2] == (byte)'D' && pdf[3] == (byte)'F', "PDF report should include PDF header");
     Expect(!System.Text.Encoding.ASCII.GetString(pdf).Contains(secret, StringComparison.Ordinal), "PDF report must not include full secret");
 

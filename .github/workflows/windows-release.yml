@@ -11,8 +11,8 @@ jobs:
     name: Build Windows artifacts
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-dotnet@87b7050bc53ea08284295505d98d2aa94301e852 # v4.0.1
         with:
           dotnet-version: "10.0.x"
       - name: Publish desktop app
@@ -33,7 +33,7 @@ jobs:
           "APP_ZIP_NAME=$appZip" | Out-File -FilePath $env:GITHUB_ENV -Append
           "CLI_ZIP_NAME=$cliZip" | Out-File -FilePath $env:GITHUB_ENV -Append
       - name: Upload to GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191 # v2.0.8
         with:
           files: |
             dist/${{ env.APP_ZIP_NAME }}

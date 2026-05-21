@@ -274,7 +274,17 @@ final class RulePackStore: ObservableObject {
 
     init() { load() }
 
-    func add(yaml: String) {
+    /// Returns an error message if the rule pack was rejected (e.g. contains
+    /// a recognized secret pattern); nil on success.
+    @discardableResult
+    func add(yaml: String) -> String? {
+        // Rule packs are persisted in plaintext (UserDefaults). Refuse to
+        // store anything that looks like an API key or token so users do not
+        // accidentally leak credentials by pasting their MCP config.
+        if SecretPatterns.containsSecret(yaml) {
+            return "Pack obsahuje API klíč nebo token. Odeberte secrety před uložením — rule pack je uložen v plaintextu."
+        }
+
         switch RulePackLoader.load(yaml: yaml) {
         case .valid(let pack):
             entries.append(RulePackEntry(name: pack.name, yaml: yaml, isEnabled: true, isValid: true))
@@ -282,6 +292,7 @@ final class RulePackStore: ObservableObject {
             entries.append(RulePackEntry(name: "Invalid pack", yaml: yaml, isEnabled: false, isValid: false, validationError: msg))
         }
         save()
+        return nil
     }
 
     func remove(at offsets: IndexSet) {
@@ -811,17 +822,18 @@ struct RulePacksSettingsSection: View {
             }
         }
         .sheet(isPresented: $isShowingAddSheet) {
-            AddRulePackSheet(text: text) { yaml in
+            AddRulePackSheet(text: text, validator: { yaml in
                 store.add(yaml: yaml)
-            }
+            })
         }
     }
 }
 
 struct AddRulePackSheet: View {
     let text: AppText
-    let onAdd: (String) -> Void
+    let validator: (String) -> String?
     @State private var yaml = ""
+    @State private var errorMessage: String?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -836,6 +848,12 @@ struct AddRulePackSheet: View {
                 .font(.system(.body, design: .monospaced))
                 .frame(minHeight: 200)
                 .border(.separator)
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
             HStack {
                 Spacer()
                 Button(text.string(.done)) {
@@ -844,7 +862,10 @@ struct AddRulePackSheet: View {
                 Button(text.string(.addRulePack)) {
                     let trimmed = yaml.trimmingCharacters(in: .whitespacesAndNewlines)
                     guard !trimmed.isEmpty else { return }
-                    onAdd(trimmed)
+                    if let error = validator(trimmed) {
+                        errorMessage = error
+                        return
+                    }
                     dismiss()
                 }
                 .keyboardShortcut(.defaultAction)

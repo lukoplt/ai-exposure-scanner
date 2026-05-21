@@ -10,6 +10,7 @@ using AIExposureScanner.Scanner.Filesystem;
 using AIExposureScanner.Scanner.Models;
 using AIExposureScanner.Scanner.Reporting;
 using AIExposureScanner.Scanner.RulePacks;
+using AIExposureScanner.Scanner.Rules;
 using Microsoft.Win32;
 
 namespace AIExposureScanner.App;
@@ -49,8 +50,18 @@ public sealed class WinRulePackStore
 
     public WinRulePackStore() { Load(); }
 
-    public void Add(string yaml)
+    /// Returns an error message if the rule pack was rejected (e.g. contains
+    /// a recognized secret pattern); null on success.
+    public string? Add(string yaml)
     {
+        // Rule packs are persisted in plaintext. Refuse to store anything that
+        // looks like an API key or token so users do not accidentally leak
+        // credentials by pasting their MCP config.
+        if (SecretPatterns.ContainsSecret(yaml))
+        {
+            return "Pack contains an API key or token. Remove secrets before saving — rule pack is stored in plaintext.";
+        }
+
         var result = RulePackLoader.Load(yaml);
         var entry = result switch
         {
@@ -60,6 +71,7 @@ public sealed class WinRulePackStore
         };
         Entries.Add(entry);
         Save();
+        return null;
     }
 
     public void Remove(RulePackEntry entry) { Entries.Remove(entry); Save(); }
@@ -188,6 +200,13 @@ public sealed class RulePacksWindow : Window
             Text = "Paste YAML rule pack content:",
             Margin = new Thickness(0, 0, 0, 4)
         };
+        var errorLabel = new TextBlock
+        {
+            Foreground = Brushes.Red,
+            TextWrapping = TextWrapping.Wrap,
+            Margin = new Thickness(0, 6, 0, 0),
+            Visibility = Visibility.Collapsed
+        };
         var addBtn = new Button { Content = "Add", Padding = new Thickness(12, 5, 12, 5), IsDefault = true };
         var cancelBtn = new Button { Content = "Cancel", Padding = new Thickness(12, 5, 12, 5), Margin = new Thickness(8, 0, 0, 0), IsCancel = true };
 
@@ -195,7 +214,13 @@ public sealed class RulePacksWindow : Window
         {
             var yaml = editor.Text.Trim();
             if (string.IsNullOrWhiteSpace(yaml)) return;
-            _store.Add(yaml);
+            var error = _store.Add(yaml);
+            if (error is not null)
+            {
+                errorLabel.Text = error;
+                errorLabel.Visibility = Visibility.Visible;
+                return;
+            }
             dialog.Close();
         };
         cancelBtn.Click += (_, _) => dialog.Close();
@@ -206,8 +231,10 @@ public sealed class RulePacksWindow : Window
 
         var stack = new DockPanel { Margin = new Thickness(16) };
         DockPanel.SetDock(btnRow, Dock.Bottom);
+        DockPanel.SetDock(errorLabel, Dock.Bottom);
         DockPanel.SetDock(hint, Dock.Top);
         stack.Children.Add(btnRow);
+        stack.Children.Add(errorLabel);
         stack.Children.Add(hint);
         stack.Children.Add(editor);
         dialog.Content = stack;
@@ -525,15 +552,30 @@ public sealed class MainWindow : Window
 
     private void OpenSelectedConfig()
     {
-        if (_selectedFinding?.AffectedPath is null)
-        {
-            return;
-        }
+        var path = _selectedFinding?.AffectedPath;
+        if (string.IsNullOrEmpty(path)) return;
 
-        Process.Start(new ProcessStartInfo(_selectedFinding.AffectedPath)
+        // Defense in depth — even though detectors only emit hard-coded config
+        // paths today, the path comes from a Finding object whose AffectedPath
+        // field is a plain string. Validate the path is fully qualified and
+        // points at an existing file, and avoid UseShellExecute=true so we do
+        // not invoke the Windows shell association handler.
+        if (!Path.IsPathFullyQualified(path)) return;
+        if (!File.Exists(path)) return;
+
+        try
         {
-            UseShellExecute = true
-        });
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = "explorer.exe",
+                Arguments = $"/select,\"{path}\"",
+                UseShellExecute = false
+            });
+        }
+        catch
+        {
+            // Opening Explorer is best-effort; never crash the app on failure.
+        }
     }
 
     private void Export(string fileName, string filter, Func<ScanResult, string> render)

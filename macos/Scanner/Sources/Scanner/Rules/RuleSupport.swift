@@ -125,7 +125,7 @@ extension McpServerFact {
     }
 }
 
-enum SecretPatterns {
+public enum SecretPatterns {
     private static let expressions: [NSRegularExpression] = [
         try! NSRegularExpression(pattern: #"sk-ant-[a-zA-Z0-9\-_]{80,}"#),
         try! NSRegularExpression(pattern: #"sk-[a-zA-Z0-9]{48}"#),
@@ -135,15 +135,26 @@ enum SecretPatterns {
         try! NSRegularExpression(pattern: #"github_pat_[a-zA-Z0-9_]{82}"#)
     ]
 
-    static func containsSecret(_ value: String) -> Bool {
+    public static func containsSecret(_ value: String) -> Bool {
         let range = NSRange(value.startIndex..<value.endIndex, in: value)
         return expressions.contains { expression in
             expression.firstMatch(in: value, range: range) != nil
         }
     }
 
+    /// Returns a masked representation that reveals only the schema prefix
+    /// (e.g. "sk-ant-", "AIza", "ghp_") and replaces all entropy characters
+    /// with bullets. Never leaks any bytes of the secret material itself.
     static func masked(_ value: String) -> String {
-        String(value.prefix(12)) + "************"
+        // Most-specific prefixes first so we never match "sk-" before "sk-ant-".
+        let knownPrefixes = ["sk-ant-", "sk-proj-", "github_pat_", "ghp_", "AIza", "sk-"]
+        for prefix in knownPrefixes {
+            if let range = value.range(of: prefix) {
+                let before = String(value[..<range.lowerBound])
+                return before + prefix + String(repeating: "•", count: 24)
+            }
+        }
+        return String(repeating: "•", count: min(value.count, 16))
     }
 }
 
