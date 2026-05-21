@@ -1,14 +1,10 @@
 # AI Exposure Scanner
 
-> Local-only security audit for your AI tools. Nothing leaves your computer.
+> Local-only security audit for your AI developer tools. Nothing leaves your computer.
 
-AI Exposure Scanner finds installed AI tools (Claude Desktop, Cursor, Windsurf, VS Code extensions, Codex CLI, Gemini CLI), audits their MCP server configurations for risky permissions, and reports plaintext credentials — with clear explanations and recommended fixes.
+AI Exposure Scanner finds installed AI tools (Claude Desktop, Cursor, Windsurf, VS Code, Codex CLI, Gemini CLI), audits their MCP server configurations for dangerous permissions, detects exposed credentials, and surfaces privacy setting issues — with severity ratings, clear explanations, and recommended fixes.
 
 **No cloud. No account. No telemetry. Zero network calls.**
-
-## Current implementation status
-
-The repository contains the v0.1 implementation: shared rule catalog, fixture corpus, Swift Scanner package, C# Scanner library, local filesystem abstractions, known-path detectors, scan orchestrators, Markdown/HTML report builders, a macOS SwiftUI app shell with PDF export, a Windows desktop shell, and a .NET CLI exporter. See [feature mapping](docs/feature-mapping.md).
 
 ---
 
@@ -18,17 +14,31 @@ The repository contains the v0.1 implementation: shared rule catalog, fixture co
 |------|----------------|
 | Claude Desktop | MCP server configs, filesystem access scope, shell execution, credentials in env |
 | Cursor | MCP server configs, Privacy Mode setting |
-| Windsurf | MCP server configs |
+| Windsurf | MCP server configs, telemetry setting |
 | VS Code (+ Cline, Roo, Continue) | Installed AI extensions, MCP configs |
 | Codex CLI | MCP configs, auth token file presence |
 | Gemini CLI | MCP configs, API key in config |
 
 ## Risk levels
 
-- **Critical** — Direct path to data exfiltration or unintended command execution
-- **High** — Serious risk requiring one additional condition
-- **Medium** — Real but limited risk; hygiene issues
-- **Low** — Informational; configuration hygiene
+| Level | Meaning |
+|-------|---------|
+| **Critical** | Direct path to data exfiltration or unintended command execution |
+| **High** | Serious risk, one additional condition away from Critical |
+| **Medium** | Real but limited risk; hygiene issues |
+| **Low** | Informational; configuration hygiene |
+
+Findings can be **escalated** automatically — e.g. a filesystem-access MCP server + a network-capable server on the same app are individually High, but together are escalated to Critical because they form a silent exfiltration path.
+
+---
+
+## Features
+
+- **15 built-in detection rules** across MCP servers, auth files, privacy settings, and extensions
+- **Context-aware escalation** — 8 escalation rules that upgrade severity for dangerous combinations
+- **YAML rule packs** — define org-specific rules, override built-in severities, add custom escalations (Settings → Rule Packs)
+- **Export** — Markdown, HTML (light + dark), PDF, JSON (`spec/report-schema.json`)
+- **Dual platform** — native macOS (SwiftUI) and Windows (WPF) apps; identical detection logic
 
 ---
 
@@ -36,78 +46,122 @@ The repository contains the v0.1 implementation: shared rule catalog, fixture co
 
 ### macOS (14+)
 
-Download `AIExposureScanner-vX.Y.Z.dmg` from [Releases](https://github.com/ai-exposure-scanner/ai-exposure-scanner/releases), open, drag to Applications.
+Download `AIExposureScanner-vX.Y.Z-macos.dmg` from [Releases](../../releases), open, drag to Applications.
 
-> The app requires Full Disk Access to read AI tool configs. You'll be prompted on first scan.
+> First launch: right-click → Open to bypass Gatekeeper (app is unsigned — no Apple developer certificate yet).
 
-```bash
-# Homebrew (after Cask PR is merged)
-brew install --cask ai-exposure-scanner
-```
+### Windows (11)
 
-### Windows (10+)
+Download `AIExposureScanner-vX.Y.Z-windows-app.zip` from [Releases](../../releases), unzip, run `AIExposureScanner.exe`.
 
-Download `AIExposureScanner-vX.Y.Z-windows-app.zip` from [Releases](https://github.com/ai-exposure-scanner/ai-exposure-scanner/releases), unzip it, and run `AIExposureScanner.exe`.
+### CLI (Windows)
 
 ```powershell
-# WinGet (after WinGet Community Repo PR is merged)
-winget install ai-exposure-scanner.AIExposureScanner
+AIExposureScanner.Cli.exe --format markdown
+AIExposureScanner.Cli.exe --format json > report.json
 ```
+
+---
+
+## Custom rule packs
+
+Paste YAML in Settings → Rule Packs (macOS) or the toolbar Rule Packs window (Windows):
+
+```yaml
+version: "1.0"
+name: "My Org Rules"
+rules:
+  - id: "ACME-001"
+    description: "Internal secrets directory exposed to MCP"
+    severity: high
+    match:
+      type: mcp_server
+      path_contains: "/secrets/"
+overrides:
+  - id: AES-CFG-003
+    severity: medium   # raise "no description" from low to medium in our org
+```
+
+Rule pack IDs must not start with `AES-`. Invalid packs are rejected with a descriptive error message — built-in rules still run.
 
 ---
 
 ## Privacy guarantee
 
-- No network calls. The macOS release entitlements explicitly keep `com.apple.security.network.client` and `com.apple.security.network.server` disabled.
-- The Windows app has no network capability declaration, and the v0.1 MSIX manifest declaration contains no `internetClient` capability.
-- API keys and secrets are detected structurally (prefix + length + charset). Their values are never logged, never stored, never shown in full — only masked previews appear in the UI and exports.
-- No telemetry. No analytics. No update checks in the background.
+- No network calls. The macOS entitlements keep `com.apple.security.network.client` disabled. The Windows manifest has no `internetClient` capability.
+- API key values are never stored, logged, or shown unmasked — only `sk-ant-…••••••••••••` style masked previews appear.
+- No telemetry, no analytics, no background update checks.
+- All detection runs synchronously against the local filesystem. Detector timeout: 5 seconds per tool.
 
 Verify yourself:
 ```bash
-# macOS
+# macOS: confirm no network entitlement
 codesign --display --entitlements - /Applications/AIExposureScanner.app | grep network
-# Expected: network client/server entitlements are false or absent
+
+# Source: confirm no network imports in Scanner library
+grep -r "URLSession\|URLRequest\|HttpClient\|WebClient" macos/Scanner/Sources/Scanner/ windows/Scanner/
+# Expected: no output
 ```
 
 ---
 
 ## Build from source
 
-### macOS
+### macOS (requires Xcode CLI tools or Xcode 16+)
 
 ```bash
-# Requires Xcode 16+
-git clone https://github.com/ai-exposure-scanner/ai-exposure-scanner
-cd ai-exposure-scanner
-swift build --package-path macos/Scanner
+# Run all fixture tests
 swift run --package-path macos/Scanner ScannerFixtureTests
-swift build --package-path macos/Scanner --product AIExposureScannerApp
-# Launch locally when you want the SwiftUI shell:
-swift run --package-path macos/Scanner AIExposureScannerApp
+
+# Build app binary
+swift build --package-path macos/Scanner --product AIExposureScannerApp -c release
 ```
 
-### Windows
+### Windows (requires .NET 8 SDK)
 
 ```powershell
-# Requires Visual Studio 2022 17.9+ with "Windows App SDK" workload
-git clone https://github.com/ai-exposure-scanner/ai-exposure-scanner
-cd ai-exposure-scanner
-dotnet build windows/AIExposureScanner.sln
+# Run all fixture tests
 dotnet run --project windows/Scanner.Tests/Scanner.Tests.csproj
-dotnet run --project windows/Scanner.Cli/Scanner.Cli.csproj -- --format markdown
-dotnet run --project windows/AIExposureScanner.App/AIExposureScanner.App.csproj
+
+# Build CLI
+dotnet publish windows/Scanner.Cli/Scanner.Cli.csproj -c Release
+
+# Build Windows app
+dotnet publish windows/AIExposureScanner.App/AIExposureScanner.App.csproj -c Release
+```
+
+### Drift check
+
+```bash
+python tools/drift-check/drift_check.py
+```
+
+Verifies every rule ID in `spec/RULES.md` is implemented in both Swift and C#. Runs on every PR.
+
+---
+
+## Repo layout
+
+```
+spec/              Rule catalog, detector specs, JSON report schema
+fixtures/          Cross-platform golden test corpus (31 cases)
+macos/Scanner/     Swift Package — Scanner library + SwiftUI app
+windows/           C# .NET 8 — Scanner library, WPF app, CLI, tests
+tools/drift-check/ CI parity enforcement
+.github/workflows/ Build, test, drift-check, release workflows
+CHANGELOG.md       Version history
 ```
 
 ---
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Key things:
+See [CONTRIBUTING.md](CONTRIBUTING.md). Short version:
 
-- Rules live in `spec/RULES.md` — the canonical source of truth for both platforms
-- Every new rule needs: `spec/RULES.md` update + `fixtures/` test cases + Swift impl + C# impl
+- Rules live in `spec/RULES.md` — canonical source of truth for both platforms
+- Every new rule needs: spec update + fixture cases + Swift impl + C# impl
 - CI drift-check blocks PRs where rule IDs are missing in either implementation
+- No network imports allowed in the Scanner library (CI enforces this)
 
 ---
 

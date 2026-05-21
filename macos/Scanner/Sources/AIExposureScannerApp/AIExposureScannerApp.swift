@@ -56,6 +56,17 @@ final class ScanViewModel: ObservableObject {
         ["All"] + Array(Set(findings.map(\.app))).sorted()
     }
 
+    var detectedTools: [String] {
+        guard let facts = result?.facts else { return [] }
+        let ids = facts.mcpServers.map(\.appId)
+            + facts.settings.map(\.appId)
+            + facts.authFiles.map(\.appId)
+            + facts.extensions.map(\.appId)
+            + facts.configFiles.map(\.appId)
+            + facts.appInstallations.filter(\.installed).map(\.appId)
+        return Array(Set(ids)).sorted()
+    }
+
     var selectedFinding: Finding? {
         filteredFindings.first { $0.id == selectedFindingId } ?? filteredFindings.first
     }
@@ -412,35 +423,102 @@ struct Header: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
+            HStack(alignment: .center) {
                 Image(systemName: "shield.lefthalf.filled")
                     .font(.system(size: 28))
-                VStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 2) {
                     Text(viewModel.text.string(.localAudit))
                         .font(.headline)
                     Text(viewModel.text.string(.privacySubtitle))
+                        .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+                Spacer()
+                Button {
+                    viewModel.scan()
+                } label: {
+                    Label(viewModel.text.string(.scan), systemImage: "play.fill")
+                        .frame(minWidth: 80)
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.regular)
+                .disabled(viewModel.isScanning)
             }
 
             if viewModel.isScanning {
-                ProgressView()
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text(viewModel.text.string(.scan) + "…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             } else if let summary = viewModel.summary {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 92), spacing: 8)], spacing: 8) {
+                HStack(spacing: 8) {
                     Metric(title: viewModel.text.string(.status), value: summary.status.title(language: viewModel.selectedLanguage))
-                    Metric(title: viewModel.text.string(.tools), value: "\(summary.toolsFound)")
+                    ToolsMetricView(
+                        title: viewModel.text.string(.tools),
+                        count: summary.toolsFound,
+                        tools: viewModel.detectedTools
+                    )
                     Metric(title: viewModel.text.string(.mcp), value: "\(summary.mcpServersFound)")
+                }
+                HStack(spacing: 8) {
                     Metric(title: viewModel.text.string(.critical), value: "\(summary.critical)")
                     Metric(title: viewModel.text.string(.high), value: "\(summary.high)")
                     Metric(title: viewModel.text.string(.medium), value: "\(summary.medium)")
                     Metric(title: viewModel.text.string(.low), value: "\(summary.low)")
                 }
-                if summary.toolsFound > 0 {
-                    Text(viewModel.text.toolScopesDetected(summary.toolsFound))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+struct ToolsMetricView: View {
+    let title: String
+    let count: Int
+    let tools: [String]
+    @State private var showPopover = false
+
+    var body: some View {
+        Button {
+            guard !tools.isEmpty else { return }
+            showPopover.toggle()
+        } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                HStack(spacing: 4) {
+                    Text("\(count)")
+                        .font(.headline)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    if !tools.isEmpty {
+                        Image(systemName: "chevron.down")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
+            .padding(8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showPopover, arrowEdge: .bottom) {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(tools, id: \.self) { tool in
+                    HStack(spacing: 8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .font(.callout)
+                        Text(tool)
+                            .font(.callout)
+                    }
+                }
+            }
+            .padding(14)
+            .presentationCompactAdaptation(.popover)
         }
     }
 }
@@ -460,6 +538,7 @@ struct Metric: View {
                 .minimumScaleFactor(0.7)
         }
         .padding(8)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(.quaternary, in: RoundedRectangle(cornerRadius: 8))
     }
 }

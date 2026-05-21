@@ -57,6 +57,7 @@ struct AppText {
         case pasteYaml
         case invalidPack
         case noRulePacks
+        case detectedTools
     }
 
     let language: AppLanguage
@@ -120,6 +121,7 @@ struct AppText {
         case .pasteYaml: "Paste YAML"
         case .invalidPack: "Invalid"
         case .noRulePacks: "No rule packs configured."
+        case .detectedTools: "Detected tools"
         }
     }
 
@@ -164,6 +166,7 @@ struct AppText {
         case .pasteYaml: "Vložit YAML"
         case .invalidPack: "Neplatný"
         case .noRulePacks: "Žádné balíčky pravidel."
+        case .detectedTools: "Detekované nástroje"
         }
     }
 }

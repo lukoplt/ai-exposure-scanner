@@ -16,3 +16,5 @@ obj/
 # Editor local state
 .vscode/
 .idea/
+
+dist/
