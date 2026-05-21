@@ -26,7 +26,9 @@ final class ScanViewModel: ObservableObject {
     @Published var selectedSeverity: SeverityFilter = .all
     @Published var selectedApp: String = "All"
     @Published var isShowingSettings = false
-    @Published var selectedLanguage: AppLanguage = .english
+    @Published var selectedLanguage: AppLanguage = ScanViewModel.loadLanguage() {
+        didSet { ScanViewModel.saveLanguage(selectedLanguage) }
+    }
 
     private let orchestrator: ScanOrchestrator
     private let reportBuilder: ReportBuilder
@@ -39,6 +41,22 @@ final class ScanViewModel: ObservableObject {
     ) {
         self.orchestrator = orchestrator
         self.reportBuilder = reportBuilder
+    }
+
+    private static let languageKey = "selectedLanguage"
+
+    private static func loadLanguage() -> AppLanguage {
+        if let raw = UserDefaults.standard.string(forKey: languageKey),
+           let saved = AppLanguage(rawValue: raw) {
+            return saved
+        }
+        // First launch: follow system locale
+        let code = Locale.current.language.languageCode?.identifier ?? ""
+        return code == "cs" ? .czech : .english
+    }
+
+    private static func saveLanguage(_ language: AppLanguage) {
+        UserDefaults.standard.set(language.rawValue, forKey: languageKey)
     }
 
     var findings: [Finding] {
