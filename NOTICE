@@ -1,0 +1,31 @@
+AI Exposure Scanner
+Copyright 2026 Lukáš Oplt
+
+This product includes software developed as part of the
+AI Exposure Scanner project (https://github.com/tsechis/ai-exposure-scanner).
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+Attribution requirement
+-----------------------
+Section 4(d) of the Apache License, Version 2.0 requires that any
+redistribution — in source or binary form — must include a readable
+copy of this NOTICE file (or its contents) in the documentation
+and/or other materials provided with the distribution.
+
+If you redistribute, fork, vendor, repackage, or otherwise reuse this
+software (in whole or in part), please credit the original author
+("Lukáš Oplt") and link back to the project's canonical repository
+(https://github.com/tsechis/ai-exposure-scanner).
+
+Third-party components
+----------------------
+This product depends on the following third-party components, each
+distributed under their own license:
+
+  * Yams (https://github.com/jpsim/Yams) — MIT License
+  * YamlDotNet (https://github.com/aaubry/YamlDotNet) — MIT License
+
+The above components are not modified by this project; they are
+referenced as package dependencies via Swift Package Manager and
+NuGet respectively.
