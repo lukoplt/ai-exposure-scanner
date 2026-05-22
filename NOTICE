@@ -2,7 +2,7 @@ AI Exposure Scanner
 Copyright 2026 Lukáš Oplt
 
 This product includes software developed as part of the
-AI Exposure Scanner project (https://github.com/tsechis/ai-exposure-scanner).
+AI Exposure Scanner project (https://github.com/lukoplt/ai-exposure-scanner).
 
 Licensed under the Apache License, Version 2.0 (see LICENSE).
 
@@ -16,7 +16,7 @@ and/or other materials provided with the distribution.
 If you redistribute, fork, vendor, repackage, or otherwise reuse this
 software (in whole or in part), please credit the original author
 ("Lukáš Oplt") and link back to the project's canonical repository
-(https://github.com/tsechis/ai-exposure-scanner).
+(https://github.com/lukoplt/ai-exposure-scanner).
 
 Third-party components
 ----------------------
