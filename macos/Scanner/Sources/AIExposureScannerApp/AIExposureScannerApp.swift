@@ -16,6 +16,15 @@ struct AIExposureScannerApp: App {
     }
 }
 
+/// Bumped per release. Passed to AIExposureUpdater so it can compare
+/// against the latest GitHub tag.
+let AIExposureScannerVersion = "0.2.0"
+
+struct AvailableUpdate: Equatable {
+    let version: String
+    let url: URL
+}
+
 @MainActor
 final class ScanViewModel: ObservableObject {
     @Published private(set) var result: ScanResult?
@@ -29,6 +38,10 @@ final class ScanViewModel: ObservableObject {
     @Published var selectedLanguage: AppLanguage = ScanViewModel.loadLanguage() {
         didSet { ScanViewModel.saveLanguage(selectedLanguage) }
     }
+    @Published var checkForUpdates: Bool = ScanViewModel.loadCheckForUpdates() {
+        didSet { ScanViewModel.saveCheckForUpdates(checkForUpdates) }
+    }
+    @Published var availableUpdate: AvailableUpdate?
 
     private let orchestrator: ScanOrchestrator
     private let reportBuilder: ReportBuilder
@@ -41,6 +54,76 @@ final class ScanViewModel: ObservableObject {
     ) {
         self.orchestrator = orchestrator
         self.reportBuilder = reportBuilder
+    }
+
+    /// Spawns the AIExposureUpdater helper (if shipped) and reloads the
+    /// update banner state from the cache file the updater writes.
+    /// No-op when the user has not opted in.
+    func performUpdateCheck() {
+        // Always reflect the latest cached result so the banner shows up
+        // even on a launch where the network is offline.
+        readCachedUpdate()
+
+        guard checkForUpdates else { return }
+
+        // Look for the AIExposureUpdater binary next to ourselves
+        // (Contents/Resources/AIExposureUpdater in the assembled app bundle).
+        let bundleURL = Bundle.main.bundleURL
+        let updaterURL = bundleURL
+            .appendingPathComponent("Contents/Resources/AIExposureUpdater")
+        guard FileManager.default.isExecutableFile(atPath: updaterURL.path) else { return }
+
+        let version = AIExposureScannerVersion
+        Task.detached(priority: .utility) {
+            let process = Process()
+            process.executableURL = updaterURL
+            process.arguments = [version]
+            process.standardOutput = nil
+            process.standardError = nil
+            do {
+                try process.run()
+                process.waitUntilExit()
+            } catch {
+                return
+            }
+            await MainActor.run { [weak self] in
+                self?.readCachedUpdate()
+            }
+        }
+    }
+
+    private func readCachedUpdate() {
+        let url = Self.updateCacheURL
+        guard
+            let data = try? Data(contentsOf: url),
+            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+            let version = json["version"] as? String,
+            let urlString = json["url"] as? String,
+            let downloadURL = URL(string: urlString)
+        else {
+            availableUpdate = nil
+            return
+        }
+        availableUpdate = AvailableUpdate(version: version, url: downloadURL)
+    }
+
+    private static var updateCacheURL: URL {
+        let base = (try? FileManager.default.url(
+            for: .cachesDirectory, in: .userDomainMask, appropriateFor: nil, create: false))
+            ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library/Caches")
+        return base
+            .appendingPathComponent("com.aiexposurescanner.app", isDirectory: true)
+            .appendingPathComponent("update.json")
+    }
+
+    private static let checkForUpdatesKey = "checkForUpdates"
+
+    private static func loadCheckForUpdates() -> Bool {
+        UserDefaults.standard.bool(forKey: checkForUpdatesKey)
+    }
+
+    private static func saveCheckForUpdates(_ enabled: Bool) {
+        UserDefaults.standard.set(enabled, forKey: checkForUpdatesKey)
     }
 
     private static let languageKey = "selectedLanguage"
@@ -332,10 +415,15 @@ struct ContentView: View {
     @StateObject private var viewModel = ScanViewModel()
 
     var body: some View {
-        NavigationSplitView {
-            Sidebar(viewModel: viewModel)
-        } detail: {
-            DetailPane(viewModel: viewModel)
+        VStack(spacing: 0) {
+            if let update = viewModel.availableUpdate {
+                UpdateBanner(update: update, text: viewModel.text)
+            }
+            NavigationSplitView {
+                Sidebar(viewModel: viewModel)
+            } detail: {
+                DetailPane(viewModel: viewModel)
+            }
         }
         .toolbar {
             ToolbarItemGroup {
@@ -388,7 +476,35 @@ struct ContentView: View {
             if viewModel.result == nil {
                 viewModel.scan()
             }
+            viewModel.performUpdateCheck()
         }
+    }
+}
+
+struct UpdateBanner: View {
+    let update: AvailableUpdate
+    let text: AppText
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "arrow.down.circle.fill")
+                .foregroundStyle(.blue)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(text.string(.updateAvailable))
+                    .font(.callout.weight(.medium))
+                Text("v\(update.version)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Link(text.string(.downloadUpdate), destination: update.url)
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(.thinMaterial)
+        .overlay(Divider(), alignment: .bottom)
     }
 }
 
@@ -676,6 +792,13 @@ struct SettingsView: View {
                 ForEach(AppLanguage.allCases) { language in
                     Text(language.displayName).tag(language)
                 }
+            }
+
+            VStack(alignment: .leading, spacing: 4) {
+                Toggle(viewModel.text.string(.checkForUpdates), isOn: $viewModel.checkForUpdates)
+                Text(viewModel.text.string(.checkForUpdatesHint))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Divider()

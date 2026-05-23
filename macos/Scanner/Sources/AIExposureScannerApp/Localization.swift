@@ -59,6 +59,10 @@ struct AppText {
         case noRulePacks
         case detectedTools
         case support
+        case checkForUpdates
+        case checkForUpdatesHint
+        case updateAvailable
+        case downloadUpdate
     }
 
     let language: AppLanguage
@@ -124,6 +128,10 @@ struct AppText {
         case .noRulePacks: "No rule packs configured."
         case .detectedTools: "Detected tools"
         case .support: "Support"
+        case .checkForUpdates: "Check for updates on launch"
+        case .checkForUpdatesHint: "Sends one HTTPS request to GitHub on each launch. Off by default."
+        case .updateAvailable: "New version available"
+        case .downloadUpdate: "Download"
         }
     }
 
@@ -170,6 +178,10 @@ struct AppText {
         case .noRulePacks: "Žádné balíčky pravidel."
         case .detectedTools: "Detekované nástroje"
         case .support: "Podpořit"
+        case .checkForUpdates: "Kontrolovat aktualizace při startu"
+        case .checkForUpdatesHint: "Při startu pošle jeden HTTPS požadavek na GitHub. Ve výchozím stavu vypnuto."
+        case .updateAvailable: "Nová verze je k dispozici"
+        case .downloadUpdate: "Stáhnout"
         }
     }
 }

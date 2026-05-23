@@ -19,6 +19,10 @@ let package = Package(
         .executable(
             name: "AIExposureScannerApp",
             targets: ["AIExposureScannerApp"]
+        ),
+        .executable(
+            name: "AIExposureUpdater",
+            targets: ["AIExposureUpdater"]
         )
     ],
     dependencies: [
@@ -38,6 +42,14 @@ let package = Package(
             name: "AIExposureScannerApp",
             dependencies: ["Scanner"],
             resources: [.process("buymeacoffee.png")]
+        ),
+        // Standalone helper that performs the GitHub Releases update check.
+        // Lives in its own target so the Scanner library and the main app
+        // can stay free of any network APIs. The main app spawns this
+        // binary only when the user has opted into update checks.
+        .executableTarget(
+            name: "AIExposureUpdater",
+            path: "Sources/AIExposureUpdater"
         )
     ]
 )

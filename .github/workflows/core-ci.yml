@@ -68,7 +68,10 @@ jobs:
           python - <<'PY'
           from pathlib import Path
 
-          roots = [Path("macos/Scanner/Sources"), Path("windows/Scanner")]
+          # Only the Scanner library itself must be free of network APIs.
+          # The standalone updater binary (AIExposureUpdater) intentionally
+          # uses URLSession and lives outside the Scanner library.
+          roots = [Path("macos/Scanner/Sources/Scanner"), Path("windows/Scanner")]
           needles = ["URLSession", "URLRequest", "HttpClient", "HttpWebRequest", "WebClient"]
           excluded_parts = {"bin", "obj", ".build", ".swiftpm"}
           hits = []
