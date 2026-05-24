@@ -55,27 +55,10 @@ var request = URLRequest(url: releasesUrl)
 request.setValue("AIExposureScanner-Updater/\(currentVersion)", forHTTPHeaderField: "User-Agent")
 request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
 
-// Synchronous wait around the async call — this is a one-shot CLI, no event loop needed.
-let semaphore = DispatchSemaphore(value: 0)
-var fetchResult: Result<(Data, URLResponse), Error> = .failure(URLError(.unknown))
-let task = session.dataTask(with: request) { data, response, error in
-    if let error {
-        fetchResult = .failure(error)
-    } else if let data, let response {
-        fetchResult = .success((data, response))
-    } else {
-        fetchResult = .failure(URLError(.badServerResponse))
-    }
-    semaphore.signal()
-}
-task.resume()
-_ = semaphore.wait(timeout: .now() + 12)
-
 let payload: (Data, URLResponse)
-switch fetchResult {
-case .success(let value):
-    payload = value
-case .failure(let error):
+do {
+    payload = try await session.data(for: request)
+} catch {
     FileHandle.standardError.write(Data("update check failed: \(error.localizedDescription)\n".utf8))
     exit(1)
 }
