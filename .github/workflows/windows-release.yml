@@ -67,14 +67,29 @@ jobs:
           "APP_ZIP_NAME=$appZip"     | Out-File -FilePath $env:GITHUB_ENV -Append
           "CLI_ZIP_NAME=$cliZip"     | Out-File -FilePath $env:GITHUB_ENV -Append
           "SETUP_EXE_NAME=$setupExe" | Out-File -FilePath $env:GITHUB_ENV -Append
-      - name: Upload to GitHub Release
-        uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191 # v2.0.8
-        with:
-          files: |
-            dist/${{ env.SETUP_EXE_NAME }}
-            dist/${{ env.SETUP_EXE_NAME }}.sha256
-            dist/${{ env.APP_ZIP_NAME }}
-            dist/${{ env.APP_ZIP_NAME }}.sha256
-            dist/${{ env.CLI_ZIP_NAME }}
-            dist/${{ env.CLI_ZIP_NAME }}.sha256
-            dist/Package.appxmanifest
+      - name: Publish to GitHub Release (idempotent)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          # Create the release if it does not exist yet — ignore the
+          # "already_exists" error that the parallel macOS-release job
+          # can produce by winning the race. Then upload with --clobber
+          # so re-runs replace the previous asset instead of failing.
+          gh release create "$env:VERSION" `
+            --title "$env:VERSION" `
+            --notes "Automated release for $env:VERSION." `
+            --target "${{ github.sha }}"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "release create returned non-zero — assuming it already exists, continuing."
+          }
+          gh release upload "$env:VERSION" `
+            "dist/$env:SETUP_EXE_NAME" `
+            "dist/$env:SETUP_EXE_NAME.sha256" `
+            "dist/$env:APP_ZIP_NAME" `
+            "dist/$env:APP_ZIP_NAME.sha256" `
+            "dist/$env:CLI_ZIP_NAME" `
+            "dist/$env:CLI_ZIP_NAME.sha256" `
+            "dist/Package.appxmanifest" `
+            --clobber

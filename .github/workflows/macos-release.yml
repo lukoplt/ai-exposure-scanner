@@ -70,17 +70,34 @@ jobs:
             --password "$APPLE_APP_PASSWORD" \
             --wait
           xcrun stapler staple dist/AIExposureScanner.app
-      - name: Create DMG
+      - name: Create DMG + SHA-256 sidecar
         env:
           VERSION: ${{ github.ref_name }}
         run: |
           set -euo pipefail
+          DMG_NAME="AIExposureScanner-${VERSION}-macos.dmg"
           hdiutil create -volname "AI Exposure Scanner" \
             -srcfolder dist/AIExposureScanner.app \
             -ov -format UDZO \
-            "dist/AIExposureScanner-${VERSION}-macos.dmg"
-          echo "DMG_NAME=AIExposureScanner-${VERSION}-macos.dmg" >> "$GITHUB_ENV"
-      - name: Upload to GitHub Release
-        uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191 # v2.0.8
-        with:
-          files: dist/${{ env.DMG_NAME }}
+            "dist/${DMG_NAME}"
+          shasum -a 256 "dist/${DMG_NAME}" | awk -v name="${DMG_NAME}" '{print $1 "  " name}' > "dist/${DMG_NAME}.sha256"
+          echo "DMG_NAME=${DMG_NAME}" >> "$GITHUB_ENV"
+      - name: Publish to GitHub Release (idempotent)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          # Create the release if it does not exist yet — ignore the
+          # "already_exists" error that the parallel Windows-release job
+          # can produce by winning the race. Then upload with --clobber so
+          # re-runs replace the previous asset instead of failing.
+          gh release create "$VERSION" \
+            --title "$VERSION" \
+            --notes "Automated release for $VERSION." \
+            --target "${{ github.sha }}" \
+            || true
+          gh release upload "$VERSION" \
+            "dist/${DMG_NAME}" \
+            "dist/${DMG_NAME}.sha256" \
+            --clobber
