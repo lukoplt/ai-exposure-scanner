@@ -71,44 +71,78 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: deskto
 Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(AppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
 
 [Code]
-// .NET 10 Desktop Runtime detection. Inspects the registry path that the
-// official .NET installers populate. Warns the user if missing but does
-// not block the install — they may have installed via a non-standard
-// route (winget, chocolatey, manual unzip) that we can't see.
+// .NET 10 Desktop Runtime detection.
+//
+// The official .NET installer registers each installed runtime version as
+// a REG_DWORD VALUE (not a subkey) inside:
+//   HKEY_LOCAL_MACHINE\SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App
+// where the value NAME is the version string ("10.0.0", "10.0.1", ...).
+//
+// The previous implementation used RegGetSubkeyNames and the 32-bit
+// WOW6432 path — that always returned empty even when .NET 10 was
+// genuinely installed, producing a false "missing runtime" warning.
+//
+// We now:
+//   1. Read value names from the 64-bit registry view (HKLM64).
+//   2. As a fallback, shell out to "dotnet --list-runtimes" and look
+//      for a "Microsoft.WindowsDesktop.App 10." line in its output —
+//      this catches installs that registered in non-standard locations
+//      (winget, chocolatey, manual unzip, dotnet-install.ps1).
 
-function IsDotNet10DesktopRuntimeInstalled(): Boolean;
+function HasDotNet10ViaRegistry(): Boolean;
 var
-  Names: TArrayOfString;
+  ValueNames: TArrayOfString;
   I: Integer;
 begin
   Result := False;
-  if RegGetSubkeyNames(HKLM,
-      'SOFTWARE\WOW6432Node\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App',
-      Names) then
-  begin
-    for I := 0 to GetArrayLength(Names) - 1 do
-    begin
-      if Pos('10.', Names[I]) = 1 then
-      begin
-        Result := True;
-        Exit;
-      end;
-    end;
-  end;
-  // Also check the non-WOW6432 path on 64-bit Windows.
-  if RegGetSubkeyNames(HKLM,
+  if RegGetValueNames(HKLM64,
       'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App',
-      Names) then
+      ValueNames) then
   begin
-    for I := 0 to GetArrayLength(Names) - 1 do
+    for I := 0 to GetArrayLength(ValueNames) - 1 do
     begin
-      if Pos('10.', Names[I]) = 1 then
+      if Pos('10.', ValueNames[I]) = 1 then
       begin
         Result := True;
         Exit;
       end;
     end;
   end;
+end;
+
+function HasDotNet10ViaCLI(): Boolean;
+var
+  TempFile, Line: String;
+  ExitCode, I: Integer;
+  Lines: TArrayOfString;
+begin
+  Result := False;
+  TempFile := ExpandConstant('{tmp}\dotnet-runtimes.txt');
+  // Run "dotnet --list-runtimes" via cmd /C so we can redirect stdout
+  // (Inno's Exec cannot capture stdout directly).
+  if Exec(ExpandConstant('{cmd}'),
+          '/C dotnet --list-runtimes > "' + TempFile + '" 2>&1',
+          '', SW_HIDE, ewWaitUntilTerminated, ExitCode) then
+  begin
+    if (ExitCode = 0) and LoadStringsFromFile(TempFile, Lines) then
+    begin
+      for I := 0 to GetArrayLength(Lines) - 1 do
+      begin
+        Line := Lines[I];
+        if Pos('Microsoft.WindowsDesktop.App 10.', Line) > 0 then
+        begin
+          Result := True;
+          Break;
+        end;
+      end;
+    end;
+  end;
+  DeleteFile(TempFile);
+end;
+
+function IsDotNet10DesktopRuntimeInstalled(): Boolean;
+begin
+  Result := HasDotNet10ViaRegistry() or HasDotNet10ViaCLI();
 end;
 
 function InitializeSetup(): Boolean;
