@@ -32,6 +32,23 @@ using MessageBoxImage = System.Windows.MessageBoxImage;
 
 namespace AIExposureScanner.App;
 
+internal static class AppIcons
+{
+    /// Cached lazy-loaded app icon used for every window's title bar +
+    /// taskbar entry. Loaded from the pack URI which resolves to the
+    /// Resource-marked AppIcon.ico inside the compiled assembly.
+    public static System.Windows.Media.ImageSource AppIcon
+    {
+        get
+        {
+            _appIcon ??= System.Windows.Media.Imaging.BitmapFrame.Create(
+                new Uri("pack://application:,,,/AppIcon.ico", UriKind.Absolute));
+            return _appIcon;
+        }
+    }
+    private static System.Windows.Media.ImageSource? _appIcon;
+}
+
 public static class Program
 {
     [STAThread]
@@ -189,6 +206,7 @@ public sealed class RulePacksWindow : Window
         ResizeMode = ResizeMode.NoResize;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = (Brush)Application.Current.Resources["ApplicationBackgroundBrush"];
+        Icon = AppIcons.AppIcon;
 
         var addButton = new Button
         {
@@ -299,7 +317,8 @@ public sealed class RulePacksWindow : Window
             ResizeMode = ResizeMode.NoResize,
             Owner = this,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            Background = (Brush)Application.Current.Resources["ApplicationBackgroundBrush"]
+            Background = (Brush)Application.Current.Resources["ApplicationBackgroundBrush"],
+            Icon = AppIcons.AppIcon
         };
 
         var editor = new TextBox
@@ -389,6 +408,7 @@ public sealed class SettingsWindow : Window
         ResizeMode = ResizeMode.NoResize;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = (Brush)Application.Current.Resources["ApplicationBackgroundBrush"];
+        Icon = AppIcons.AppIcon;
 
         var assemblyVersion =
             System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)
@@ -640,6 +660,7 @@ public sealed class MainWindow : FluentWindow
         Height = 800;
         MinWidth = 980;
         MinHeight = 680;
+        Icon = AppIcons.AppIcon;
         WindowBackdropType = WindowBackdropType.Mica;
         ExtendsContentIntoTitleBar = true;
 

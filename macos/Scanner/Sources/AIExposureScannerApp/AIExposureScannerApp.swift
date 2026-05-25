@@ -8,7 +8,7 @@ struct AIExposureScannerApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .frame(minWidth: 980, minHeight: 680)
+                .frame(minWidth: 1040, minHeight: 760)
         }
         .commands {
             CommandGroup(replacing: .newItem) {}
