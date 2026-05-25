@@ -61,19 +61,31 @@ Findings are **automatically escalated** when a dangerous combination appears �
 ### macOS 14+ (prebuilt DMG)
 
 1. Download `AIExposureScanner-vX.Y.Z-macos.dmg` from the [latest release](../../releases/latest).
-2. Open the DMG, drag the app onto the **Applications** shortcut.
-3. **First launch:** right-click the app → **Open** to bypass Gatekeeper.
+2. Open the DMG and drag the app onto the **Applications** shortcut.
+3. **First launch:** see the version-specific instructions below.
 
-> The DMG is currently **ad-hoc signed only** (no Apple Developer certificate is purchased for this project). Gatekeeper will warn on first launch. Once an Apple Developer account is set up the release pipeline will automatically sign + notarize.
+> The DMG is currently **ad-hoc signed only** (no Apple Developer certificate is purchased for this project). Gatekeeper will block the app on first launch. Once an Apple Developer account is set up the release pipeline will automatically sign + notarize.
+
+#### First launch on macOS 15 (Sequoia) and macOS 26 (Tahoe)
+
+On these versions the right-click → **Open** shortcut for unsigned
+apps has been removed. The unblock control moved to System Settings:
+
+1. Double-click the app in `/Applications` once — macOS will refuse to launch it and show a "could not be opened" message. Close the dialog.
+2. Open **System Settings → Privacy & Security**.
+3. Scroll to the bottom — you will see a line *"AIExposureScanner was blocked to protect your Mac."* with an **Open Anyway** button. Click it.
+4. macOS prompts for your password and shows the "are you sure" dialog. Click **Open Anyway** again.
+
+The app is now whitelisted; every subsequent launch works normally.
+
+#### First launch on macOS 14 (Sonoma)
+
+1. **Right-click** (or Control-click) the app in `/Applications` → **Open**.
+2. macOS shows an "are you sure" dialog. Click **Open**.
 
 #### "App is damaged and can't be opened"
 
-On recent macOS versions Gatekeeper sometimes refuses to open an
-ad-hoc-signed app downloaded from the internet, displaying the
-misleading message **"AIExposureScanner is damaged and can't be
-opened. You should move it to the Trash."** The app is not actually
-damaged — macOS just refuses to honour the ad-hoc signature once the
-file carries the `com.apple.quarantine` extended attribute.
+If macOS instead reports **"AIExposureScanner is damaged and can't be opened. You should move it to the Trash."**, the binary is not actually damaged — Gatekeeper is refusing to honour the ad-hoc signature because of the `com.apple.quarantine` extended attribute that browsers automatically set on internet downloads.
 
 Strip the quarantine attribute manually:
 
@@ -81,9 +93,7 @@ Strip the quarantine attribute manually:
 xattr -dr com.apple.quarantine /Applications/AIExposureScanner.app
 ```
 
-After running that, double-clicking the app opens it normally. You
-only need to do this once per install; subsequent launches work
-without any extra steps.
+After running that, double-clicking the app opens it normally. You only need to do this once per install; subsequent launches work without any extra steps.
 
 ### Windows 10/11
 
