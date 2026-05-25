@@ -170,10 +170,16 @@ internal static class SeverityVisuals
 }
 
 // MARK: - Rule Packs window -------------------------------------------------
+//
+// Plain System.Windows.Window — NOT FluentWindow — so the Mica backdrop and
+// the custom Wpf.Ui.Controls.TitleBar do not destabilise the dialog opening
+// path. Previous FluentWindow + Mica + custom-TitleBar combo crashed on
+// click. Items are built imperatively per entry; no FrameworkElementFactory.
 
-public sealed class RulePacksWindow : FluentWindow
+public sealed class RulePacksWindow : Window
 {
     private readonly WinRulePackStore _store;
+    private readonly StackPanel _list = new();
 
     public RulePacksWindow(WinRulePackStore store)
     {
@@ -183,16 +189,7 @@ public sealed class RulePacksWindow : FluentWindow
         Height = 520;
         ResizeMode = ResizeMode.NoResize;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        WindowBackdropType = WindowBackdropType.Mica;
-        ExtendsContentIntoTitleBar = true;
-
-        var listView = new ListView
-        {
-            ItemsSource = store.Entries,
-            BorderThickness = new Thickness(0),
-            Background = Brushes.Transparent,
-            ItemTemplate = BuildEntryTemplate()
-        };
+        Background = (Brush)Application.Current.Resources["ApplicationBackgroundBrush"];
 
         var addButton = new Button
         {
@@ -215,79 +212,87 @@ public sealed class RulePacksWindow : FluentWindow
         buttonRow.Children.Add(new Border { Width = 8 });
         buttonRow.Children.Add(closeButton);
 
-        var root = new DockPanel { Margin = new Thickness(20, 56, 20, 20) };
-        DockPanel.SetDock(buttonRow, Dock.Bottom);
-        root.Children.Add(buttonRow);
-        root.Children.Add(listView);
-
-        var titleBar = new Wpf.Ui.Controls.TitleBar
+        var scroll = new ScrollViewer
         {
-            Title = "Rule Packs",
-            VerticalAlignment = VerticalAlignment.Top
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Content = _list
         };
 
-        var host = new Grid();
-        host.Children.Add(root);
-        host.Children.Add(titleBar);
-        Content = host;
+        var root = new DockPanel { Margin = new Thickness(20) };
+        DockPanel.SetDock(buttonRow, Dock.Bottom);
+        root.Children.Add(buttonRow);
+        root.Children.Add(scroll);
+        Content = root;
+
+        store.Entries.CollectionChanged += (_, _) => RefreshList();
+        RefreshList();
     }
 
-    private DataTemplate BuildEntryTemplate()
+    private void RefreshList()
     {
-        // <Border Padding="12" Margin="0,0,0,8" CornerRadius="6"
-        //         Background="{DynamicResource ControlFillColorSecondaryBrush}">
-        //   <DockPanel>
-        //     <Button DockPanel.Dock="Right" Icon="Delete24"/>
-        //     <StackPanel>
-        //       <TextBlock Text="{Binding Name}"/>
-        //       <TextBlock Text="{Binding ValidationError}" Foreground="Red"/>
-        //     </StackPanel>
-        //   </DockPanel>
-        // </Border>
-
-        var border = new FrameworkElementFactory(typeof(Border));
-        border.SetValue(Border.PaddingProperty, new Thickness(12));
-        border.SetValue(Border.MarginProperty, new Thickness(0, 0, 0, 8));
-        border.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
-        border.SetResourceReference(Border.BackgroundProperty, "ControlFillColorSecondaryBrush");
-
-        var dock = new FrameworkElementFactory(typeof(DockPanel));
-
-        var deleteBtn = new FrameworkElementFactory(typeof(Button));
-        deleteBtn.SetValue(Button.IconProperty, new SymbolIcon(SymbolRegular.Delete24));
-        deleteBtn.SetValue(Button.AppearanceProperty, ControlAppearance.Transparent);
-        deleteBtn.SetValue(DockPanel.DockProperty, Dock.Right);
-        deleteBtn.AddHandler(System.Windows.Controls.Button.ClickEvent, new RoutedEventHandler((s, _) =>
+        _list.Children.Clear();
+        if (_store.Entries.Count == 0)
         {
-            if (s is FrameworkElement fe && fe.DataContext is RulePackEntry entry)
-                _store.Remove(entry);
-        }));
+            _list.Children.Add(new TextBlock
+            {
+                Text = "No rule packs configured.",
+                Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+                Margin = new Thickness(0, 16, 0, 0)
+            });
+            return;
+        }
+        foreach (var entry in _store.Entries)
+        {
+            _list.Children.Add(BuildEntryCard(entry));
+        }
+    }
 
-        var stack = new FrameworkElementFactory(typeof(StackPanel));
+    private Border BuildEntryCard(RulePackEntry entry)
+    {
+        var name = new TextBlock
+        {
+            Text = entry.Name,
+            FontWeight = FontWeights.SemiBold
+        };
+        var stack = new StackPanel();
+        stack.Children.Add(name);
+        if (!string.IsNullOrEmpty(entry.ValidationError))
+        {
+            stack.Children.Add(new TextBlock
+            {
+                Text = entry.ValidationError,
+                Foreground = new SolidColorBrush(Color.FromRgb(0xE0, 0x1E, 0x5A)),
+                FontSize = 11,
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 2, 0, 0)
+            });
+        }
 
-        var nameBlock = new FrameworkElementFactory(typeof(TextBlock));
-        nameBlock.SetBinding(TextBlock.TextProperty, new Binding("Name"));
-        nameBlock.SetValue(TextBlock.FontWeightProperty, FontWeights.SemiBold);
+        var deleteBtn = new Button
+        {
+            Icon = new SymbolIcon(SymbolRegular.Delete24),
+            Appearance = ControlAppearance.Transparent
+        };
+        deleteBtn.Click += (_, _) => _store.Remove(entry);
 
-        var errBlock = new FrameworkElementFactory(typeof(TextBlock));
-        errBlock.SetBinding(TextBlock.TextProperty, new Binding("ValidationError"));
-        errBlock.SetValue(TextBlock.ForegroundProperty, new SolidColorBrush(Color.FromRgb(0xE0, 0x1E, 0x5A)));
-        errBlock.SetValue(TextBlock.FontSizeProperty, 11.0);
-        errBlock.SetValue(TextBlock.MarginProperty, new Thickness(0, 2, 0, 0));
-        errBlock.SetValue(TextBlock.TextWrappingProperty, TextWrapping.Wrap);
+        var dock = new DockPanel();
+        DockPanel.SetDock(deleteBtn, Dock.Right);
+        dock.Children.Add(deleteBtn);
+        dock.Children.Add(stack);
 
-        stack.AppendChild(nameBlock);
-        stack.AppendChild(errBlock);
-        dock.AppendChild(deleteBtn);
-        dock.AppendChild(stack);
-        border.AppendChild(dock);
-
-        return new DataTemplate { VisualTree = border };
+        return new Border
+        {
+            Padding = new Thickness(12),
+            Margin = new Thickness(0, 0, 0, 8),
+            CornerRadius = new CornerRadius(6),
+            Background = (Brush)Application.Current.Resources["ControlFillColorSecondaryBrush"],
+            Child = dock
+        };
     }
 
     private void ShowAddDialog()
     {
-        var dialog = new FluentWindow
+        var dialog = new Window
         {
             Title = "Add Rule Pack",
             Width = 600,
@@ -295,8 +300,7 @@ public sealed class RulePacksWindow : FluentWindow
             ResizeMode = ResizeMode.NoResize,
             Owner = this,
             WindowStartupLocation = WindowStartupLocation.CenterOwner,
-            WindowBackdropType = WindowBackdropType.Mica,
-            ExtendsContentIntoTitleBar = true
+            Background = (Brush)Application.Current.Resources["ApplicationBackgroundBrush"]
         };
 
         var editor = new TextBox
@@ -353,7 +357,7 @@ public sealed class RulePacksWindow : FluentWindow
         btnRow.Children.Add(addBtn);
         btnRow.Children.Add(cancelBtn);
 
-        var stack = new DockPanel { Margin = new Thickness(20, 56, 20, 20) };
+        var stack = new DockPanel { Margin = new Thickness(20) };
         DockPanel.SetDock(btnRow, Dock.Bottom);
         DockPanel.SetDock(errorBar, Dock.Bottom);
         DockPanel.SetDock(hint, Dock.Top);
@@ -362,16 +366,122 @@ public sealed class RulePacksWindow : FluentWindow
         stack.Children.Add(hint);
         stack.Children.Add(editor);
 
-        var titleBar = new Wpf.Ui.Controls.TitleBar
-        {
-            Title = "Add Rule Pack",
-            VerticalAlignment = VerticalAlignment.Top
-        };
-        var host = new Grid();
-        host.Children.Add(stack);
-        host.Children.Add(titleBar);
-        dialog.Content = host;
+        dialog.Content = stack;
         dialog.ShowDialog();
+    }
+}
+
+// MARK: - Settings window ---------------------------------------------------
+
+public sealed class SettingsWindow : Window
+{
+    public SettingsWindow()
+    {
+        Title = "Settings";
+        Width = 480;
+        Height = 420;
+        ResizeMode = ResizeMode.NoResize;
+        WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        Background = (Brush)Application.Current.Resources["ApplicationBackgroundBrush"];
+
+        var stack = new StackPanel { Margin = new Thickness(24) };
+
+        // Title
+        stack.Children.Add(new TextBlock
+        {
+            Text = "Settings",
+            FontSize = 22,
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 0, 0, 16)
+        });
+
+        // Version row
+        var assemblyVersion =
+            System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)
+            ?? "0.0.0";
+        stack.Children.Add(LabeledRow("Version", assemblyVersion));
+
+        // GitHub Releases link
+        var releasesLink = new Hyperlink(new Run("GitHub Releases"))
+        {
+            NavigateUri = new Uri("https://github.com/lukoplt/ai-exposure-scanner/releases")
+        };
+        releasesLink.RequestNavigate += (_, e) =>
+        {
+            Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
+            e.Handled = true;
+        };
+        var releasesBlock = new TextBlock { Margin = new Thickness(0, 4, 0, 12) };
+        releasesBlock.Inlines.Add(releasesLink);
+        stack.Children.Add(releasesBlock);
+
+        // GitHub repo link
+        var repoLink = new Hyperlink(new Run("Source code on GitHub"))
+        {
+            NavigateUri = new Uri("https://github.com/lukoplt/ai-exposure-scanner")
+        };
+        repoLink.RequestNavigate += (_, e) =>
+        {
+            Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
+            e.Handled = true;
+        };
+        var repoBlock = new TextBlock { Margin = new Thickness(0, 0, 0, 24) };
+        repoBlock.Inlines.Add(repoLink);
+        stack.Children.Add(repoBlock);
+
+        // Support row
+        stack.Children.Add(new TextBlock
+        {
+            Text = "Made with ❤ by Lukáš Oplt",
+            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+            FontSize = 12,
+            Margin = new Thickness(0, 0, 0, 8)
+        });
+
+        var supportBtn = new Button
+        {
+            Content = "☕ Buy me a coffee",
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Background = new SolidColorBrush(Color.FromRgb(0xFF, 0xE0, 0x17)),
+            Foreground = Brushes.Black,
+            BorderThickness = new Thickness(0),
+            Padding = new Thickness(14, 6, 14, 6)
+        };
+        supportBtn.Click += (_, _) =>
+            Process.Start(new ProcessStartInfo("https://www.buymeacoffee.com/lukasoplt") { UseShellExecute = true });
+        stack.Children.Add(supportBtn);
+
+        // Close button at bottom
+        var closeBtn = new Button
+        {
+            Content = "Close",
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 24, 0, 0),
+            IsDefault = true,
+            IsCancel = true
+        };
+        closeBtn.Click += (_, _) => Close();
+        stack.Children.Add(closeBtn);
+
+        Content = stack;
+    }
+
+    private static UIElement LabeledRow(string label, string value)
+    {
+        var grid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        var labelBlock = new TextBlock
+        {
+            Text = label,
+            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+        };
+        var valueBlock = new TextBlock { Text = value };
+        Grid.SetColumn(labelBlock, 0);
+        Grid.SetColumn(valueBlock, 1);
+        grid.Children.Add(labelBlock);
+        grid.Children.Add(valueBlock);
+        return grid;
     }
 }
 
@@ -547,7 +657,40 @@ public sealed class MainWindow : FluentWindow
             Appearance = ControlAppearance.Secondary,
             Margin = new Thickness(16, 0, 0, 0)
         };
-        rulePacksBtn.Click += (_, _) => new RulePacksWindow(_rulePackStore) { Owner = this }.ShowDialog();
+        rulePacksBtn.Click += (_, _) =>
+        {
+            try
+            {
+                var win = new RulePacksWindow(_rulePackStore) { Owner = this };
+                win.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(this, ex.ToString(), "Rule Packs failed to open",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        };
+
+        var settingsBtn = new Button
+        {
+            Content = "Settings",
+            Icon = new SymbolIcon(SymbolRegular.Settings24),
+            Appearance = ControlAppearance.Secondary,
+            Margin = new Thickness(8, 0, 0, 0)
+        };
+        settingsBtn.Click += (_, _) =>
+        {
+            try
+            {
+                var win = new SettingsWindow { Owner = this };
+                win.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(this, ex.ToString(), "Settings failed to open",
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        };
 
         var leftStack = new StackPanel { Orientation = Orientation.Horizontal };
         leftStack.Children.Add(_scanButton);
@@ -560,6 +703,7 @@ public sealed class MainWindow : FluentWindow
         leftStack.Children.Add(Spacer());
         leftStack.Children.Add(_exportJsonButton);
         leftStack.Children.Add(rulePacksBtn);
+        leftStack.Children.Add(settingsBtn);
 
         _lastScanLabel.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
 
