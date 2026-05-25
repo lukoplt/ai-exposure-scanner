@@ -64,6 +64,7 @@ struct AppText {
         case updateAvailable
         case downloadUpdate
         case lastScan
+        case disclaimer
     }
 
     let language: AppLanguage
@@ -134,6 +135,7 @@ struct AppText {
         case .updateAvailable: "New version available"
         case .downloadUpdate: "Download"
         case .lastScan: "Last scan"
+        case .disclaimer: "This tool cannot guarantee 100% security. Its purpose is to help you spot common AI exposure risks — it does not replace a full security audit."
         }
     }
 
@@ -185,6 +187,7 @@ struct AppText {
         case .updateAvailable: "Nová verze je k dispozici"
         case .downloadUpdate: "Stáhnout"
         case .lastScan: "Poslední sken"
+        case .disclaimer: "Tento nástroj nezaručuje 100% zabezpečení. Jeho účelem je pomoci odhalit běžná rizika expozice AI nástrojů — nenahrazuje plný bezpečnostní audit."
         }
     }
 }

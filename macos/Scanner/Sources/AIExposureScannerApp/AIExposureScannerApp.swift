@@ -452,6 +452,7 @@ struct ContentView: View {
             } detail: {
                 DetailPane(viewModel: viewModel)
             }
+            DisclaimerBar(text: viewModel.text)
         }
         .toolbar {
             ToolbarItemGroup {
@@ -506,6 +507,27 @@ struct ContentView: View {
             }
             viewModel.performUpdateCheck()
         }
+    }
+}
+
+struct DisclaimerBar: View {
+    let text: AppText
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "info.circle")
+                .font(.caption2)
+            Text(text.string(.disclaimer))
+                .font(.caption2)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+        }
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.thinMaterial)
+        .overlay(Divider(), alignment: .top)
     }
 }
 

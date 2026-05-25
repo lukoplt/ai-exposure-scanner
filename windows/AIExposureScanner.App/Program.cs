@@ -458,6 +458,7 @@ public sealed class MainWindow : FluentWindow
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // toolbar
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // summary cards
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });  // main
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // disclaimer footer
 
         Grid.SetRow(titleBar, 0);
         root.Children.Add(titleBar);
@@ -474,7 +475,47 @@ public sealed class MainWindow : FluentWindow
         Grid.SetRow(content, 3);
         root.Children.Add(content);
 
+        var disclaimer = BuildDisclaimerBar();
+        Grid.SetRow(disclaimer, 4);
+        root.Children.Add(disclaimer);
+
         return root;
+    }
+
+    private UIElement BuildDisclaimerBar()
+    {
+        var icon = new SymbolIcon(SymbolRegular.Info24)
+        {
+            FontSize = 14,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, 8, 0)
+        };
+
+        var label = new TextBlock
+        {
+            Text = "This tool cannot guarantee 100% security. Its purpose is to help you spot common AI exposure risks — it does not replace a full security audit.",
+            FontSize = 11,
+            TextWrapping = TextWrapping.Wrap,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        label.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+
+        var stack = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(20, 8, 20, 8)
+        };
+        stack.Children.Add(icon);
+        stack.Children.Add(label);
+
+        var border = new Border
+        {
+            BorderThickness = new Thickness(0, 1, 0, 0),
+            BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"],
+            Background = (Brush)Application.Current.Resources["LayerOnAcrylicFillColorDefaultBrush"],
+            Child = stack
+        };
+        return border;
     }
 
     private UIElement BuildToolbar()
