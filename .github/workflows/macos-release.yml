@@ -33,7 +33,7 @@ jobs:
           cp macos/Scanner/.build/release/AIExposureUpdater dist/AIExposureScanner.app/Contents/Resources/AIExposureUpdater
           chmod +x dist/AIExposureScanner.app/Contents/MacOS/AIExposureScanner
           chmod +x dist/AIExposureScanner.app/Contents/Resources/AIExposureUpdater
-      - name: Codesign app when certificate is configured
+      - name: Codesign app
         env:
           MACOS_CERTIFICATE_P12_BASE64: ${{ secrets.MACOS_CERTIFICATE_P12_BASE64 }}
           MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
@@ -42,7 +42,19 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${MACOS_CERTIFICATE_P12_BASE64:-}" ] || [ -z "${MACOS_CODESIGN_IDENTITY:-}" ]; then
-            echo "Signing secrets not configured; producing unsigned local-test bundle."
+            echo "No Apple Developer cert configured — applying ad-hoc signature."
+            # Ad-hoc sign (identity "-") so Gatekeeper sees A signature
+            # rather than nothing. Without this the quarantine attribute
+            # macOS adds to internet-downloaded files makes Gatekeeper
+            # show "AIExposureScanner is damaged and can't be opened",
+            # which is a much worse UX than the "unidentified developer"
+            # right-click-to-Open prompt an ad-hoc sign produces.
+            # Sign the embedded helper binary first so --deep sees it.
+            codesign --force --sign - \
+              dist/AIExposureScanner.app/Contents/Resources/AIExposureUpdater
+            codesign --force --deep --sign - \
+              dist/AIExposureScanner.app
+            codesign --verify --deep --strict dist/AIExposureScanner.app
             exit 0
           fi
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain

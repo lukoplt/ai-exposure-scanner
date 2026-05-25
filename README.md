@@ -60,11 +60,30 @@ Findings are **automatically escalated** when a dangerous combination appears �
 
 ### macOS 14+ (prebuilt DMG)
 
-1. Download `AIExposureScanner-v0.2.0-macos.dmg` from the [latest release](../../releases/latest).
+1. Download `AIExposureScanner-vX.Y.Z-macos.dmg` from the [latest release](../../releases/latest).
 2. Open the DMG, drag the app onto the **Applications** shortcut.
 3. **First launch:** right-click the app → **Open** to bypass Gatekeeper.
 
-> The DMG is currently **unsigned** (no Apple Developer certificate yet). Gatekeeper will warn on first launch. Once an Apple Developer account is set up the release pipeline will automatically sign + notarize.
+> The DMG is currently **ad-hoc signed only** (no Apple Developer certificate is purchased for this project). Gatekeeper will warn on first launch. Once an Apple Developer account is set up the release pipeline will automatically sign + notarize.
+
+#### "App is damaged and can't be opened"
+
+On recent macOS versions Gatekeeper sometimes refuses to open an
+ad-hoc-signed app downloaded from the internet, displaying the
+misleading message **"AIExposureScanner is damaged and can't be
+opened. You should move it to the Trash."** The app is not actually
+damaged — macOS just refuses to honour the ad-hoc signature once the
+file carries the `com.apple.quarantine` extended attribute.
+
+Strip the quarantine attribute manually:
+
+```bash
+xattr -dr com.apple.quarantine /Applications/AIExposureScanner.app
+```
+
+After running that, double-clicking the app opens it normally. You
+only need to do this once per install; subsequent launches work
+without any extra steps.
 
 ### Windows 10/11
 
