@@ -76,10 +76,18 @@ jobs:
         run: |
           set -euo pipefail
           DMG_NAME="AIExposureScanner-${VERSION}-macos.dmg"
+          # Stage the .app alongside a symlink to /Applications so the
+          # mounted DMG presents the standard "drag the app onto the
+          # Applications folder shortcut" install layout.
+          rm -rf dist/dmg_staging
+          mkdir -p dist/dmg_staging
+          cp -R dist/AIExposureScanner.app dist/dmg_staging/
+          ln -sf /Applications dist/dmg_staging/Applications
           hdiutil create -volname "AI Exposure Scanner" \
-            -srcfolder dist/AIExposureScanner.app \
+            -srcfolder dist/dmg_staging \
             -ov -format UDZO \
             "dist/${DMG_NAME}"
+          rm -rf dist/dmg_staging
           shasum -a 256 "dist/${DMG_NAME}" | awk -v name="${DMG_NAME}" '{print $1 "  " name}' > "dist/${DMG_NAME}.sha256"
           echo "DMG_NAME=${DMG_NAME}" >> "$GITHUB_ENV"
       - name: Publish to GitHub Release (idempotent)
