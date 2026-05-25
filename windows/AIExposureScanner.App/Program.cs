@@ -411,6 +411,25 @@ public sealed class MainWindow : FluentWindow
     private readonly Button _exportPdfButton = new();
     private readonly Button _exportJsonButton = new();
 
+    // "Last scan: 12:34:56" timestamp shown in the toolbar so the user
+    // gets visible feedback even when a re-scan returns identical findings.
+    private readonly TextBlock _lastScanLabel = new()
+    {
+        FontSize = 11,
+        VerticalAlignment = VerticalAlignment.Center,
+        Margin = new Thickness(16, 0, 0, 0)
+    };
+
+    // Detected tools surfaced via the clickable Tools metric card (popup).
+    private readonly System.Collections.ObjectModel.ObservableCollection<string> _detectedTools = [];
+    private readonly System.Windows.Controls.Primitives.Popup _toolsPopup = new()
+    {
+        Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
+        StaysOpen = false,
+        AllowsTransparency = true,
+        PopupAnimation = System.Windows.Controls.Primitives.PopupAnimation.Fade
+    };
+
     public MainWindow()
     {
         Title = "AI Exposure Scanner";
@@ -489,24 +508,27 @@ public sealed class MainWindow : FluentWindow
         };
         rulePacksBtn.Click += (_, _) => new RulePacksWindow(_rulePackStore) { Owner = this }.ShowDialog();
 
-        var panel = new StackPanel
-        {
-            Orientation = Orientation.Horizontal,
-            Margin = new Thickness(20, 48, 20, 12)
-        };
-        panel.Children.Add(_scanButton);
-        panel.Children.Add(Spacer());
-        panel.Children.Add(_exportMarkdownButton);
-        panel.Children.Add(Spacer());
-        panel.Children.Add(_exportHtmlButton);
-        panel.Children.Add(Spacer());
-        panel.Children.Add(_exportPdfButton);
-        panel.Children.Add(Spacer());
-        panel.Children.Add(_exportJsonButton);
-        panel.Children.Add(rulePacksBtn);
+        var leftStack = new StackPanel { Orientation = Orientation.Horizontal };
+        leftStack.Children.Add(_scanButton);
+        leftStack.Children.Add(Spacer());
+        leftStack.Children.Add(_exportMarkdownButton);
+        leftStack.Children.Add(Spacer());
+        leftStack.Children.Add(_exportHtmlButton);
+        leftStack.Children.Add(Spacer());
+        leftStack.Children.Add(_exportPdfButton);
+        leftStack.Children.Add(Spacer());
+        leftStack.Children.Add(_exportJsonButton);
+        leftStack.Children.Add(rulePacksBtn);
+
+        _lastScanLabel.SetResourceReference(TextBlock.ForegroundProperty, "TextFillColorSecondaryBrush");
+
+        var dock = new DockPanel { Margin = new Thickness(20, 48, 20, 12) };
+        DockPanel.SetDock(leftStack, Dock.Left);
+        dock.Children.Add(leftStack);
+        dock.Children.Add(_lastScanLabel);
 
         UpdateExportButtons();
-        return panel;
+        return dock;
     }
 
     private static Border Spacer() => new() { Width = 8 };
@@ -520,13 +542,112 @@ public sealed class MainWindow : FluentWindow
             Margin = new Thickness(20, 0, 20, 12)
         };
         panel.Children.Add(MetricCard("Status", _statusValue));
-        panel.Children.Add(MetricCard("Tools", _toolsValue));
+        panel.Children.Add(ToolsMetricCard());
         panel.Children.Add(MetricCard("MCP", _mcpValue));
         panel.Children.Add(MetricCard("Critical", _criticalValue, Severity.Critical));
         panel.Children.Add(MetricCard("High", _highValue, Severity.High));
         panel.Children.Add(MetricCard("Medium", _mediumValue, Severity.Medium));
         panel.Children.Add(MetricCard("Low", _lowValue, Severity.Low));
         return panel;
+    }
+
+    private UIElement ToolsMetricCard()
+    {
+        var labelBlock = new TextBlock
+        {
+            Text = "Tools",
+            FontSize = 11,
+            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
+            Margin = new Thickness(0, 0, 0, 4)
+        };
+
+        _toolsValue.Text = "—";
+
+        var chevron = new SymbolIcon(SymbolRegular.ChevronDown16)
+        {
+            FontSize = 12,
+            Margin = new Thickness(6, 4, 0, 0),
+            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
+        };
+
+        var valueRow = new StackPanel { Orientation = Orientation.Horizontal };
+        valueRow.Children.Add(_toolsValue);
+        valueRow.Children.Add(chevron);
+
+        var stack = new StackPanel();
+        stack.Children.Add(labelBlock);
+        stack.Children.Add(valueRow);
+
+        var border = new Border
+        {
+            Padding = new Thickness(16, 12, 16, 12),
+            Margin = new Thickness(4, 0, 4, 0),
+            CornerRadius = new CornerRadius(8),
+            Background = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"],
+            BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"],
+            BorderThickness = new Thickness(1),
+            Child = stack,
+            Cursor = System.Windows.Input.Cursors.Hand
+        };
+
+        // Build the popup body — a vertically stacked list of detected app ids.
+        var listItems = new ItemsControl
+        {
+            ItemsSource = _detectedTools,
+            ItemTemplate = BuildToolItemTemplate()
+        };
+        var popupCard = new Border
+        {
+            Padding = new Thickness(14),
+            CornerRadius = new CornerRadius(8),
+            Background = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"],
+            BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"],
+            BorderThickness = new Thickness(1),
+            Effect = new System.Windows.Media.Effects.DropShadowEffect
+            {
+                BlurRadius = 16,
+                ShadowDepth = 2,
+                Opacity = 0.35,
+                Color = Colors.Black
+            },
+            Child = listItems,
+            MinWidth = 220
+        };
+        _toolsPopup.Child = popupCard;
+        _toolsPopup.PlacementTarget = border;
+
+        border.MouseLeftButtonUp += (_, _) =>
+        {
+            if (_detectedTools.Count == 0) return;
+            _toolsPopup.IsOpen = !_toolsPopup.IsOpen;
+        };
+
+        return border;
+    }
+
+    private static DataTemplate BuildToolItemTemplate()
+    {
+        // <StackPanel Orientation="Horizontal" Margin="0,3,0,3">
+        //   <SymbolIcon Symbol="CheckmarkCircle24" Foreground="Green"/>
+        //   <TextBlock Text="{Binding}" Margin="8,0,0,0"/>
+        // </StackPanel>
+        var row = new FrameworkElementFactory(typeof(StackPanel));
+        row.SetValue(StackPanel.OrientationProperty, Orientation.Horizontal);
+        row.SetValue(StackPanel.MarginProperty, new Thickness(0, 3, 0, 3));
+
+        var icon = new FrameworkElementFactory(typeof(SymbolIcon));
+        icon.SetValue(SymbolIcon.SymbolProperty, SymbolRegular.CheckmarkCircle24);
+        icon.SetValue(SymbolIcon.ForegroundProperty, new SolidColorBrush(Color.FromRgb(0x2E, 0xA0, 0x43)));
+        icon.SetValue(SymbolIcon.VerticalAlignmentProperty, VerticalAlignment.Center);
+
+        var text = new FrameworkElementFactory(typeof(TextBlock));
+        text.SetBinding(TextBlock.TextProperty, new Binding());
+        text.SetValue(TextBlock.MarginProperty, new Thickness(8, 0, 0, 0));
+        text.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
+
+        row.AppendChild(icon);
+        row.AppendChild(text);
+        return new DataTemplate { VisualTree = row };
     }
 
     private static Border MetricCard(string label, TextBlock value, Severity? severity = null)
@@ -711,6 +832,7 @@ public sealed class MainWindow : FluentWindow
             _result = await _orchestrator.ScanAsync(new LocalFilesystem(), packs: _rulePackStore.ActivePacks);
             RefreshSummary();
             RefreshAppFilter();
+            RefreshDetectedTools();
             RefreshVisibleFindings();
             UpdateExportButtons();
         }
@@ -722,7 +844,29 @@ public sealed class MainWindow : FluentWindow
         {
             _scanButton.IsEnabled = true;
             _scanButton.Content = "Scan";
+
+            // Always update the timestamp so the user sees visible feedback
+            // even when a re-scan produces the exact same findings as the
+            // previous one.
+            _lastScanLabel.Text = $"Last scan: {DateTime.Now:HH:mm:ss}";
         }
+    }
+
+    private void RefreshDetectedTools()
+    {
+        _detectedTools.Clear();
+        if (_result is null) return;
+
+        var ids = _result.Facts.McpServers.Select(m => m.AppId)
+            .Concat(_result.Facts.Settings.Select(s => s.AppId))
+            .Concat(_result.Facts.AuthFiles.Select(a => a.AppId))
+            .Concat(_result.Facts.Extensions.Select(e => e.AppId))
+            .Concat(_result.Facts.ConfigFiles.Select(c => c.AppId))
+            .Concat(_result.Facts.AppInstallations.Where(a => a.Installed).Select(a => a.AppId))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(s => s, StringComparer.Ordinal);
+
+        foreach (var id in ids) _detectedTools.Add(id);
     }
 
     private void RefreshSummary()

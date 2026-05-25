@@ -18,7 +18,7 @@ struct AIExposureScannerApp: App {
 
 /// Bumped per release. Passed to AIExposureUpdater so it can compare
 /// against the latest GitHub tag.
-let AIExposureScannerVersion = "0.2.1"
+let AIExposureScannerVersion = "0.2.2"
 
 struct AvailableUpdate: Equatable {
     let version: String
@@ -42,6 +42,7 @@ final class ScanViewModel: ObservableObject {
         didSet { ScanViewModel.saveCheckForUpdates(checkForUpdates) }
     }
     @Published var availableUpdate: AvailableUpdate?
+    @Published private(set) var lastScanAt: Date?
 
     private let orchestrator: ScanOrchestrator
     private let reportBuilder: ReportBuilder
@@ -177,21 +178,44 @@ final class ScanViewModel: ObservableObject {
     }
 
     func scan() {
+        guard !isScanning else { return }
         isScanning = true
         errorMessage = nil
 
-        do {
-            let scanResult = try orchestrator.scan(fs: LocalFilesystem(), packs: rulePackStore.activePacks)
-            result = scanResult
-            summary = ReportSummary(scanResult: scanResult)
-            selectedSeverity = .all
-            selectedApp = "All"
-            selectedFindingId = scanResult.findings.first?.id
-        } catch {
-            errorMessage = String(describing: error)
-        }
+        // Snapshot inputs on MainActor before jumping to background work so
+        // the detached task captures plain value types.
+        let orchestrator = self.orchestrator
+        let packs = rulePackStore.activePacks
 
-        isScanning = false
+        Task {
+            // Yield once so SwiftUI gets a frame to show the "Scanning…"
+            // state before we begin the (synchronous, CPU-bound) work.
+            await Task.yield()
+
+            let outcome: Result<ScanResult, Error> = await Task.detached(priority: .userInitiated) {
+                do {
+                    return .success(try orchestrator.scan(fs: LocalFilesystem(), packs: packs))
+                } catch {
+                    return .failure(error)
+                }
+            }.value
+
+            switch outcome {
+            case .success(let scanResult):
+                self.result = scanResult
+                self.summary = ReportSummary(scanResult: scanResult)
+                self.selectedSeverity = .all
+                self.selectedApp = "All"
+                self.selectedFindingId = scanResult.findings.first?.id
+            case .failure(let error):
+                self.errorMessage = String(describing: error)
+            }
+
+            // Always update the timestamp so the user sees visible feedback
+            // even when the scan produces the exact same findings as last time.
+            self.lastScanAt = Date()
+            self.isScanning = false
+        }
     }
 
     func exportMarkdown() {
@@ -566,6 +590,13 @@ struct FilterBar: View {
 struct Header: View {
     @ObservedObject var viewModel: ScanViewModel
 
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateStyle = .none
+        f.timeStyle = .medium
+        return f
+    }()
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center) {
@@ -577,6 +608,11 @@ struct Header: View {
                     Text(viewModel.text.string(.privacySubtitle))
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    if let lastScanAt = viewModel.lastScanAt {
+                        Text("\(viewModel.text.string(.lastScan)): \(Self.timeFormatter.string(from: lastScanAt))")
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
                 Spacer()
                 Button {

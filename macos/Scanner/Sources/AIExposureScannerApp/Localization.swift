@@ -63,6 +63,7 @@ struct AppText {
         case checkForUpdatesHint
         case updateAvailable
         case downloadUpdate
+        case lastScan
     }
 
     let language: AppLanguage
@@ -132,6 +133,7 @@ struct AppText {
         case .checkForUpdatesHint: "Sends one HTTPS request to GitHub on each launch. Off by default."
         case .updateAvailable: "New version available"
         case .downloadUpdate: "Download"
+        case .lastScan: "Last scan"
         }
     }
 
@@ -182,6 +184,7 @@ struct AppText {
         case .checkForUpdatesHint: "Při startu pošle jeden HTTPS požadavek na GitHub. Ve výchozím stavu vypnuto."
         case .updateAvailable: "Nová verze je k dispozici"
         case .downloadUpdate: "Stáhnout"
+        case .lastScan: "Poslední sken"
         }
     }
 }
