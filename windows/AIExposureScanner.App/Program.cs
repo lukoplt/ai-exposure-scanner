@@ -44,15 +44,14 @@ public static class Program
 
         // Inject the WPF-UI theme + control resource dictionaries so that
         // every Wpf.Ui.Controls.* element resolves its Fluent styles.
+        // Light theme by default — feels less heavy for a desktop audit
+        // tool that is primarily read text and badges.
         app.Resources.MergedDictionaries.Add(new ThemesDictionary
         {
-            Theme = ApplicationTheme.Dark
+            Theme = ApplicationTheme.Light
         });
         app.Resources.MergedDictionaries.Add(new ControlsDictionary());
-
-        // Honour the current Windows light/dark mode and request Mica
-        // backdrop on the main window.
-        ApplicationThemeManager.ApplySystemTheme();
+        ApplicationThemeManager.Apply(ApplicationTheme.Light);
 
         app.Run(new MainWindow());
     }
@@ -375,113 +374,207 @@ public sealed class RulePacksWindow : Window
 
 public sealed class SettingsWindow : Window
 {
+    private static readonly Brush CardBg =
+        (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"];
+    private static readonly Brush CardStroke =
+        (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"];
+    private static readonly Brush SecondaryText =
+        (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"];
+
     public SettingsWindow()
     {
         Title = "Settings";
-        Width = 480;
-        Height = 420;
+        Width = 540;
+        Height = 600;
         ResizeMode = ResizeMode.NoResize;
         WindowStartupLocation = WindowStartupLocation.CenterOwner;
         Background = (Brush)Application.Current.Resources["ApplicationBackgroundBrush"];
 
-        var stack = new StackPanel { Margin = new Thickness(24) };
-
-        // Title
-        stack.Children.Add(new TextBlock
-        {
-            Text = "Settings",
-            FontSize = 22,
-            FontWeight = FontWeights.SemiBold,
-            Margin = new Thickness(0, 0, 0, 16)
-        });
-
-        // Version row
         var assemblyVersion =
             System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString(3)
             ?? "0.0.0";
-        stack.Children.Add(LabeledRow("Version", assemblyVersion));
 
-        // GitHub Releases link
-        var releasesLink = new Hyperlink(new Run("GitHub Releases"))
+        // Close button (bottom row).
+        var closeBtn = new Button
         {
-            NavigateUri = new Uri("https://github.com/lukoplt/ai-exposure-scanner/releases")
+            Content = "Close",
+            HorizontalAlignment = HorizontalAlignment.Right,
+            Margin = new Thickness(0, 16, 0, 0),
+            IsDefault = true,
+            IsCancel = true,
+            Appearance = ControlAppearance.Primary,
+            Padding = new Thickness(20, 6, 20, 6)
         };
-        releasesLink.RequestNavigate += (_, e) =>
-        {
-            Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
-            e.Handled = true;
-        };
-        var releasesBlock = new TextBlock { Margin = new Thickness(0, 4, 0, 12) };
-        releasesBlock.Inlines.Add(releasesLink);
-        stack.Children.Add(releasesBlock);
+        closeBtn.Click += (_, _) => Close();
 
-        // GitHub repo link
-        var repoLink = new Hyperlink(new Run("Source code on GitHub"))
-        {
-            NavigateUri = new Uri("https://github.com/lukoplt/ai-exposure-scanner")
-        };
-        repoLink.RequestNavigate += (_, e) =>
-        {
-            Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
-            e.Handled = true;
-        };
-        var repoBlock = new TextBlock { Margin = new Thickness(0, 0, 0, 24) };
-        repoBlock.Inlines.Add(repoLink);
-        stack.Children.Add(repoBlock);
+        var stack = new StackPanel();
 
-        // Support row
+        // Title header
         stack.Children.Add(new TextBlock
         {
-            Text = "Made with ❤ by Lukáš Oplt",
-            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"],
-            FontSize = 12,
-            Margin = new Thickness(0, 0, 0, 8)
+            Text = "Settings",
+            FontSize = 28,
+            FontWeight = FontWeights.SemiBold,
+            Margin = new Thickness(0, 0, 0, 4)
+        });
+        stack.Children.Add(new TextBlock
+        {
+            Text = "AI Exposure Scanner preferences and links",
+            Foreground = SecondaryText,
+            FontSize = 13,
+            Margin = new Thickness(0, 0, 0, 20)
         });
 
-        var supportBtn = new Button
+        // About card
+        stack.Children.Add(BuildCard("About", new[]
+        {
+            KeyValueRow("Application", "AI Exposure Scanner"),
+            KeyValueRow("Version", assemblyVersion),
+            KeyValueRow("Author", "Lukáš Oplt"),
+            KeyValueRow("License", "Apache-2.0")
+        }));
+
+        // Links card
+        stack.Children.Add(BuildCard("Links", new UIElement[]
+        {
+            LinkRow(SymbolRegular.ArrowDownload24, "GitHub Releases",
+                "https://github.com/lukoplt/ai-exposure-scanner/releases"),
+            LinkRow(SymbolRegular.Code24, "Source code on GitHub",
+                "https://github.com/lukoplt/ai-exposure-scanner"),
+            LinkRow(SymbolRegular.Bug24, "Report an issue",
+                "https://github.com/lukoplt/ai-exposure-scanner/issues/new")
+        }));
+
+        // Support card
+        stack.Children.Add(BuildCard("Support", new UIElement[]
+        {
+            new TextBlock
+            {
+                Text = "Made with ❤ by Lukáš Oplt",
+                Foreground = SecondaryText,
+                FontSize = 13,
+                Margin = new Thickness(0, 0, 0, 10)
+            },
+            BuildSupportButton()
+        }));
+
+        stack.Children.Add(closeBtn);
+
+        // Outer scroll so we never clip on smaller DPI.
+        var scroll = new ScrollViewer
+        {
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+            Padding = new Thickness(28, 24, 28, 24),
+            Content = stack
+        };
+        Content = scroll;
+    }
+
+    private static Border BuildCard(string heading, UIElement[] body)
+    {
+        var headingBlock = new TextBlock
+        {
+            Text = heading,
+            FontSize = 11,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = SecondaryText,
+            Margin = new Thickness(0, 0, 0, 10)
+        };
+        // Letter-spacing emulation: use uppercase + slight tracking via Padding,
+        // since plain WPF TextBlock has no CharacterSpacing pre-.NET 9.
+        headingBlock.Text = heading.ToUpperInvariant();
+
+        var inner = new StackPanel();
+        inner.Children.Add(headingBlock);
+        foreach (var elem in body) inner.Children.Add(elem);
+
+        return new Border
+        {
+            Background = CardBg,
+            BorderBrush = CardStroke,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(8),
+            Padding = new Thickness(16),
+            Margin = new Thickness(0, 0, 0, 16),
+            Child = inner
+        };
+    }
+
+    private static UIElement KeyValueRow(string label, string value)
+    {
+        var grid = new Grid { Margin = new Thickness(0, 4, 0, 4) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var labelBlock = new TextBlock
+        {
+            Text = label,
+            Foreground = SecondaryText,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var valueBlock = new TextBlock
+        {
+            Text = value,
+            FontWeight = FontWeights.Medium,
+            VerticalAlignment = VerticalAlignment.Center,
+            TextWrapping = TextWrapping.Wrap
+        };
+        Grid.SetColumn(labelBlock, 0);
+        Grid.SetColumn(valueBlock, 1);
+        grid.Children.Add(labelBlock);
+        grid.Children.Add(valueBlock);
+        return grid;
+    }
+
+    private static UIElement LinkRow(SymbolRegular icon, string text, string url)
+    {
+        var iconControl = new SymbolIcon(icon)
+        {
+            FontSize = 16,
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = (Brush)Application.Current.Resources["AccentTextFillColorPrimaryBrush"]
+        };
+
+        var run = new Run(text);
+        var hyperlink = new Hyperlink(run) { NavigateUri = new Uri(url) };
+        hyperlink.RequestNavigate += (_, e) =>
+        {
+            Process.Start(new ProcessStartInfo(e.Uri.AbsoluteUri) { UseShellExecute = true });
+            e.Handled = true;
+        };
+        var textBlock = new TextBlock
+        {
+            Margin = new Thickness(10, 0, 0, 0),
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        textBlock.Inlines.Add(hyperlink);
+
+        var row = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Margin = new Thickness(0, 4, 0, 4)
+        };
+        row.Children.Add(iconControl);
+        row.Children.Add(textBlock);
+        return row;
+    }
+
+    private static UIElement BuildSupportButton()
+    {
+        var btn = new Button
         {
             Content = "☕ Buy me a coffee",
             HorizontalAlignment = HorizontalAlignment.Left,
             Background = new SolidColorBrush(Color.FromRgb(0xFF, 0xE0, 0x17)),
             Foreground = Brushes.Black,
             BorderThickness = new Thickness(0),
-            Padding = new Thickness(14, 6, 14, 6)
+            Padding = new Thickness(16, 8, 16, 8),
+            FontWeight = FontWeights.SemiBold
         };
-        supportBtn.Click += (_, _) =>
+        btn.Click += (_, _) =>
             Process.Start(new ProcessStartInfo("https://www.buymeacoffee.com/lukasoplt") { UseShellExecute = true });
-        stack.Children.Add(supportBtn);
-
-        // Close button at bottom
-        var closeBtn = new Button
-        {
-            Content = "Close",
-            HorizontalAlignment = HorizontalAlignment.Right,
-            Margin = new Thickness(0, 24, 0, 0),
-            IsDefault = true,
-            IsCancel = true
-        };
-        closeBtn.Click += (_, _) => Close();
-        stack.Children.Add(closeBtn);
-
-        Content = stack;
-    }
-
-    private static UIElement LabeledRow(string label, string value)
-    {
-        var grid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
-        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        var labelBlock = new TextBlock
-        {
-            Text = label,
-            Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
-        };
-        var valueBlock = new TextBlock { Text = value };
-        Grid.SetColumn(labelBlock, 0);
-        Grid.SetColumn(valueBlock, 1);
-        grid.Children.Add(labelBlock);
-        grid.Children.Add(valueBlock);
-        return grid;
+        return btn;
     }
 }
 
