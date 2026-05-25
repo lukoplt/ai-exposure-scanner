@@ -66,13 +66,40 @@ Findings are **automatically escalated** when a dangerous combination appears �
 
 > The DMG is currently **unsigned** (no Apple Developer certificate yet). Gatekeeper will warn on first launch. Once an Apple Developer account is set up the release pipeline will automatically sign + notarize.
 
-### Windows 10/11 (build from source — no prebuilt installer yet)
+### Windows 10/11
 
-There is **no prebuilt Windows installer in v0.2.0**. To run the Windows app, build it yourself on a Windows machine — instructions below in [Build from source → Windows](#windows-net-10-sdk-required).
+Starting with v0.2.1 the release page ships prebuilt **framework-dependent** ZIPs:
 
-The Scanner library, CLI, WPF app, and full test suite all build cleanly on .NET 10. CI on `windows-2025-vs2026` runners verifies this on every push.
+- `AIExposureScanner-vX.Y.Z-windows-app.zip` — WPF GUI app
+- `AIExposureScanner-vX.Y.Z-windows-cli.zip` — command-line scanner
+- `*.sha256` — checksum sidecar for each ZIP
 
-A signed prebuilt installer will land in a later release once Windows code-signing is set up.
+**Requirements on the target machine:**
+- Windows 10 (1809+) or Windows 11
+- [.NET 10 Desktop Runtime (x64)](https://dotnet.microsoft.com/download/dotnet/10.0) — installed system-wide; the app cannot launch without it
+
+> Framework-dependent builds (≈2 MB) are intentionally used instead of single-file self-contained binaries (≈80 MB). Windows Defender's heuristic flags the single-file unpacker stub almost universally for unsigned apps — framework-dependent binaries are much less likely to be quarantined.
+
+#### Dealing with Defender / SmartScreen on first launch
+
+**The Windows binaries are intentionally unsigned.** No code-signing certificate is purchased for this project. Defender and SmartScreen will likely show one of these on first run:
+
+1. **"Windows protected your PC"** — click **More info** → **Run anyway**
+2. **"This file came from another computer and might be blocked"** — right-click the ZIP → **Properties** → **Unblock** → OK, *before* extracting
+3. **File silently quarantined** — open Windows Security → **Virus & threat protection** → **Protection history**, find the entry, **Allow on device**
+
+**Always verify the SHA-256 first.** GitHub stores the sidecar `.sha256` files next to each ZIP on the release page:
+
+```powershell
+Get-FileHash AIExposureScanner-v0.2.1-windows-app.zip -Algorithm SHA256
+# Compare the printed hash to the contents of AIExposureScanner-v0.2.1-windows-app.zip.sha256
+```
+
+If the hash matches the value on the GitHub release page (which is served over TLS from `github.com`), the file you downloaded is byte-identical to the one CI built from the public source — Defender's warning is heuristic noise, not a real malware finding.
+
+#### Building from source yourself
+
+If you do not trust the prebuilt ZIPs (entirely reasonable), build locally — instructions below in [Build from source → Windows](#windows-net-10-sdk-required). Building from source gives you a binary signed implicitly by your own machine; Defender treats locally-built binaries far more leniently.
 
 ---
 
@@ -260,6 +287,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Short version:
 | Malicious rule pack stores secrets in plaintext | `SecretPatterns.ContainsSecret` pre-save scan rejects YAML with key patterns |
 | Supply chain — compromised CI action | All GitHub Actions versioned via floating major tags (`@v5`, `@v6`) — accept supply-chain risk in exchange for getting CVE fixes automatically |
 | Supply chain — compromised YAML lib | `YamlDotNet 17.0.0` pinned (no float); Yams locked via `Package.resolved` |
+| Windows binary integrity (no code-signing cert purchased) | Each release ships SHA-256 sidecar; users verify hash against the file served over TLS by `github.com`. Defender heuristic warnings handled in README. Reproducible from source via `.github/workflows/windows-release.yml`. |
 | Symlink loop on broad scan | Both `FilesystemFacade` implementations skip junctions/symlinks before recursing |
 | Path-injection RCE via Affected Path | Windows `Process.Start` uses `explorer.exe /select,…` with `UseShellExecute=false` after `IsPathFullyQualified` + `File.Exists` validation |
 

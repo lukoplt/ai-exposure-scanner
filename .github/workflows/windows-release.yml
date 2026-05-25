@@ -15,13 +15,19 @@ jobs:
       - uses: actions/setup-dotnet@v5
         with:
           dotnet-version: "10.0.x"
+      # Framework-dependent build (requires .NET 10 runtime on the user's
+      # machine) instead of self-contained single-file. The single-file
+      # unpacker stub triggers aggressive Defender heuristics; framework-
+      # dependent output is plain DLLs + small EXE that Defender treats
+      # like any other .NET app. Users without code signing get fewer
+      # false positives this way.
       - name: Publish desktop app
-        run: dotnet publish windows/AIExposureScanner.App/AIExposureScanner.App.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --output dist/windows-app
+        run: dotnet publish windows/AIExposureScanner.App/AIExposureScanner.App.csproj --configuration Release --runtime win-x64 --self-contained false --output dist/windows-app
       - name: Publish CLI
-        run: dotnet publish windows/Scanner.Cli/Scanner.Cli.csproj --configuration Release --runtime win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true --output dist/windows-cli
+        run: dotnet publish windows/Scanner.Cli/Scanner.Cli.csproj --configuration Release --runtime win-x64 --self-contained false --output dist/windows-cli
       - name: Copy MSIX manifest declaration
         run: copy windows\AIExposureScanner.App\Package.appxmanifest dist\Package.appxmanifest
-      - name: Archive artifacts
+      - name: Archive artifacts + emit SHA-256 sidecar
         shell: pwsh
         env:
           VERSION: ${{ github.ref_name }}
@@ -30,6 +36,14 @@ jobs:
           $cliZip = "AIExposureScanner-${env:VERSION}-windows-cli.zip"
           Compress-Archive -Path dist/windows-app/* -DestinationPath "dist/$appZip" -Force
           Compress-Archive -Path dist/windows-cli/* -DestinationPath "dist/$cliZip" -Force
+
+          # Generate SHA-256 sidecars so users can verify integrity even
+          # though the binaries are unsigned.
+          $appHash = Get-FileHash "dist/$appZip" -Algorithm SHA256
+          $cliHash = Get-FileHash "dist/$cliZip" -Algorithm SHA256
+          "$($appHash.Hash.ToLower())  $appZip" | Out-File "dist/$appZip.sha256" -Encoding ascii
+          "$($cliHash.Hash.ToLower())  $cliZip" | Out-File "dist/$cliZip.sha256" -Encoding ascii
+
           "APP_ZIP_NAME=$appZip" | Out-File -FilePath $env:GITHUB_ENV -Append
           "CLI_ZIP_NAME=$cliZip" | Out-File -FilePath $env:GITHUB_ENV -Append
       - name: Upload to GitHub Release
@@ -37,5 +51,7 @@ jobs:
         with:
           files: |
             dist/${{ env.APP_ZIP_NAME }}
+            dist/${{ env.APP_ZIP_NAME }}.sha256
             dist/${{ env.CLI_ZIP_NAME }}
+            dist/${{ env.CLI_ZIP_NAME }}.sha256
             dist/Package.appxmanifest
