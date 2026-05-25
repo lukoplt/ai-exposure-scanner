@@ -27,29 +27,47 @@ jobs:
         run: dotnet publish windows/Scanner.Cli/Scanner.Cli.csproj --configuration Release --runtime win-x64 --self-contained false --output dist/windows-cli
       - name: Copy MSIX manifest declaration
         run: copy windows\AIExposureScanner.App\Package.appxmanifest dist\Package.appxmanifest
-      - name: Archive artifacts + emit SHA-256 sidecar
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+      - name: Build Inno Setup installer
         shell: pwsh
         env:
           VERSION: ${{ github.ref_name }}
         run: |
-          $appZip = "AIExposureScanner-${env:VERSION}-windows-app.zip"
-          $cliZip = "AIExposureScanner-${env:VERSION}-windows-cli.zip"
+          # Strip the leading "v" from the tag for AppVersion (Inno wants
+          # bare numeric versions in VersionInfoVersion).
+          $bareVersion = $env:VERSION -replace '^v',''
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" `
+            /Q "/DAppVersion=$bareVersion" `
+            windows/Installer/AIExposureScanner.iss
+      - name: Archive artifacts + emit SHA-256 sidecars
+        shell: pwsh
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          $bareVersion = $env:VERSION -replace '^v',''
+          $appZip   = "AIExposureScanner-${env:VERSION}-windows-app.zip"
+          $cliZip   = "AIExposureScanner-${env:VERSION}-windows-cli.zip"
+          $setupExe = "AIExposureScanner-v${bareVersion}-windows-setup.exe"
           Compress-Archive -Path dist/windows-app/* -DestinationPath "dist/$appZip" -Force
           Compress-Archive -Path dist/windows-cli/* -DestinationPath "dist/$cliZip" -Force
 
           # Generate SHA-256 sidecars so users can verify integrity even
           # though the binaries are unsigned.
-          $appHash = Get-FileHash "dist/$appZip" -Algorithm SHA256
-          $cliHash = Get-FileHash "dist/$cliZip" -Algorithm SHA256
-          "$($appHash.Hash.ToLower())  $appZip" | Out-File "dist/$appZip.sha256" -Encoding ascii
-          "$($cliHash.Hash.ToLower())  $cliZip" | Out-File "dist/$cliZip.sha256" -Encoding ascii
+          foreach ($file in @($appZip, $cliZip, $setupExe)) {
+            $hash = Get-FileHash "dist/$file" -Algorithm SHA256
+            "$($hash.Hash.ToLower())  $file" | Out-File "dist/$file.sha256" -Encoding ascii
+          }
 
-          "APP_ZIP_NAME=$appZip" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "CLI_ZIP_NAME=$cliZip" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "APP_ZIP_NAME=$appZip"     | Out-File -FilePath $env:GITHUB_ENV -Append
+          "CLI_ZIP_NAME=$cliZip"     | Out-File -FilePath $env:GITHUB_ENV -Append
+          "SETUP_EXE_NAME=$setupExe" | Out-File -FilePath $env:GITHUB_ENV -Append
       - name: Upload to GitHub Release
         uses: softprops/action-gh-release@c062e08bd532815e2082a85e87e3ef29c3e6d191 # v2.0.8
         with:
           files: |
+            dist/${{ env.SETUP_EXE_NAME }}
+            dist/${{ env.SETUP_EXE_NAME }}.sha256
             dist/${{ env.APP_ZIP_NAME }}
             dist/${{ env.APP_ZIP_NAME }}.sha256
             dist/${{ env.CLI_ZIP_NAME }}

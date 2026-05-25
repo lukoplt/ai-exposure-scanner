@@ -68,17 +68,18 @@ Findings are **automatically escalated** when a dangerous combination appears �
 
 ### Windows 10/11
 
-Starting with v0.2.1 the release page ships prebuilt **framework-dependent** ZIPs:
+Starting with v0.2.1 the release page ships:
 
-- `AIExposureScanner-vX.Y.Z-windows-app.zip` — WPF GUI app
-- `AIExposureScanner-vX.Y.Z-windows-cli.zip` — command-line scanner
-- `*.sha256` — checksum sidecar for each ZIP
+- **`AIExposureScanner-vX.Y.Z-windows-setup.exe`** — Inno Setup installer (recommended). Wizard UI, optional desktop shortcut, registers under Programs and Features, supports clean uninstall, can be installed per-user (no admin) or per-machine (admin).
+- `AIExposureScanner-vX.Y.Z-windows-app.zip` — same WPF GUI app as a portable ZIP. Use this if you do not want to run an installer.
+- `AIExposureScanner-vX.Y.Z-windows-cli.zip` — command-line scanner (portable).
+- `*.sha256` — checksum sidecar for every asset above.
 
 **Requirements on the target machine:**
 - Windows 10 (1809+) or Windows 11
-- [.NET 10 Desktop Runtime (x64)](https://dotnet.microsoft.com/download/dotnet/10.0) — installed system-wide; the app cannot launch without it
+- [.NET 10 Desktop Runtime (x64)](https://dotnet.microsoft.com/download/dotnet/10.0) — installed system-wide; the app cannot launch without it. The installer warns you if it is missing but does not block — it will not auto-download a runtime.
 
-> Framework-dependent builds (≈2 MB) are intentionally used instead of single-file self-contained binaries (≈80 MB). Windows Defender's heuristic flags the single-file unpacker stub almost universally for unsigned apps — framework-dependent binaries are much less likely to be quarantined.
+> Framework-dependent builds (≈2 MB) are intentionally used instead of single-file self-contained binaries (≈80 MB). Windows Defender's heuristic flags the single-file unpacker stub almost universally for unsigned apps — framework-dependent binaries are much less likely to be quarantined. The Inno Setup installer is a well-known wrapper Defender recognizes by signature.
 
 #### Dealing with Defender / SmartScreen on first launch
 
