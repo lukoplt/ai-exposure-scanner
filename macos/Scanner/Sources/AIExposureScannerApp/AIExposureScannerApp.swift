@@ -16,9 +16,13 @@ struct AIExposureScannerApp: App {
     }
 }
 
-/// Bumped per release. Passed to AIExposureUpdater so it can compare
-/// against the latest GitHub tag.
-let AIExposureScannerVersion = "0.2.6"
+/// Read from the bundle's CFBundleShortVersionString so there is one
+/// source of truth — Info.plist. Used in two places:
+///   1. The Settings sheet shows it next to "Version"
+///   2. AIExposureUpdater receives it as a CLI arg to compare against
+///      the latest GitHub release tag.
+let AIExposureScannerVersion: String =
+    (Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String) ?? "0.0.0"
 
 struct AvailableUpdate: Equatable {
     let version: String
@@ -843,7 +847,7 @@ struct SettingsView: View {
 
             Divider()
 
-            LabeledContent(viewModel.text.string(.version), value: "0.2.0")
+            LabeledContent(viewModel.text.string(.version), value: AIExposureScannerVersion)
 
             Link(
                 viewModel.text.string(.githubReleases),
