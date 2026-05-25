@@ -596,11 +596,16 @@ public sealed class MainWindow : FluentWindow
             ItemsSource = _detectedTools,
             ItemTemplate = BuildToolItemTemplate()
         };
+        // Popup uses AllowsTransparency=true so the rounded corners can
+        // clip cleanly. That means the inner Border MUST paint a fully
+        // opaque background — the WPF-UI "Card" brushes are translucent
+        // acrylic by design and look see-through on a transparent popup.
+        // SolidBackgroundFillColorBaseBrush is the opaque base layer.
         var popupCard = new Border
         {
             Padding = new Thickness(14),
             CornerRadius = new CornerRadius(8),
-            Background = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"],
+            Background = (Brush)Application.Current.Resources["SolidBackgroundFillColorBaseBrush"],
             BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"],
             BorderThickness = new Thickness(1),
             Effect = new System.Windows.Media.Effects.DropShadowEffect

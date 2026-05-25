@@ -18,7 +18,7 @@ struct AIExposureScannerApp: App {
 
 /// Bumped per release. Passed to AIExposureUpdater so it can compare
 /// against the latest GitHub tag.
-let AIExposureScannerVersion = "0.2.5"
+let AIExposureScannerVersion = "0.2.6"
 
 struct AvailableUpdate: Equatable {
     let version: String
