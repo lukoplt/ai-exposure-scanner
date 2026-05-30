@@ -39,6 +39,15 @@ public sealed class RuleEvaluator
         new AESAUTH003(),
         new AESCFG002(),
         new AESCFG003(),
-        new AESCFG004()
+        new AESCFG004(),
+        new AESMCP008(),
+        new AESMCP009(),
+        new AESMCP010(),
+        new AESMCP011(),
+        new AESMCP012(),
+        new AESMCP013(),
+        new AESAUTH004(),
+        new AESAUTH005(),
+        new AESAUTH006()
     ];
 }

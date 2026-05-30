@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-MCP-010",
+      "severity": "high",
+      "app": "ai-threats",
+      "serverName": "remote-sse"
+    }
+  ]
+}

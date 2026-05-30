@@ -83,6 +83,51 @@ internal static class RuleTexts
             "AI tool config file is world-readable",
             "A configuration file can be read by other users or broad principals.",
             "Restrict the config file permissions."
+        ),
+        ["AES-MCP-008"] = new(
+            "MCP server overrides the AI model API base URL",
+            "An environment variable redirects model API traffic to a non-official endpoint, which can route every prompt and response through a third party.",
+            "Remove the base URL override unless the proxy is fully trusted, and prefer official provider endpoints."
+        ),
+        ["AES-MCP-009"] = new(
+            "MCP server runs a remote install script",
+            "The server downloads and pipes a script from the internet straight into a shell, executing unreviewed remote code on every run.",
+            "Install the server from a pinned, vetted package instead of piping a network download into a shell."
+        ),
+        ["AES-MCP-010"] = new(
+            "MCP server uses a plaintext HTTP endpoint",
+            "The server talks to a remote endpoint over unencrypted HTTP, exposing traffic to interception and tampering.",
+            "Switch the endpoint to HTTPS, or restrict it to a trusted local address."
+        ),
+        ["AES-MCP-011"] = new(
+            "MCP server can access SSH or cloud credential directories",
+            "The server is scoped to a directory or file holding SSH keys or cloud credentials, giving an agent a direct path to crown-jewel secrets.",
+            "Re-scope the server away from credential directories such as ~/.ssh, ~/.aws, or ~/.gnupg."
+        ),
+        ["AES-MCP-012"] = new(
+            "MCP server can access the Docker daemon socket",
+            "The server can reach the Docker socket or runs privileged containers, which is equivalent to root on the host and enables container escape.",
+            "Remove Docker socket access and privileged flags from this server."
+        ),
+        ["AES-MCP-013"] = new(
+            "Messaging or email MCP server can exfiltrate data",
+            "The server can send messages or email, giving a prompt-injected agent an outbound channel to leak data.",
+            "Disable messaging servers when not actively needed and restrict their scopes and recipients."
+        ),
+        ["AES-AUTH-004"] = new(
+            "Cloud provider credentials in MCP server env",
+            "Long-lived cloud access keys are stored in plain text in configuration, exposing the cloud account to any agent or prompt injection.",
+            "Move cloud credentials to a secrets manager or short-lived role-based credentials, never plain config."
+        ),
+        ["AES-AUTH-005"] = new(
+            "Database connection string with credentials",
+            "A database URL embeds a username and password in plain text, exposing the database to any agent that reads this configuration.",
+            "Use a secrets manager or credential-free connection method instead of an inline password."
+        ),
+        ["AES-AUTH-006"] = new(
+            "Plaintext secret in MCP server env",
+            "An environment variable whose name indicates a secret holds a plain text literal value in configuration.",
+            "Move the secret to the OS keychain or a secrets manager and reference it indirectly."
         )
     };
 }
@@ -259,4 +304,198 @@ internal static partial class PackageVersion
 
     [GeneratedRegex(@"@\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?$")]
     private static partial Regex PinnedVersionRegex();
+}
+
+/// <summary>
+/// Detection helpers for AI-tool-specific exposure patterns (AES-MCP-008..013, AES-AUTH-004..006).
+/// Kept in lock-step with the Swift <c>AiThreatPatterns</c> so both platforms detect identically.
+/// </summary>
+internal static partial class AiThreatPatterns
+{
+    // Cloud credentials (AES-AUTH-004)
+    private static readonly HashSet<string> CloudCredentialKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "AWS_ACCESS_KEY_ID",
+        "AWS_SECRET_ACCESS_KEY",
+        "AWS_SESSION_TOKEN",
+        "AZURE_CLIENT_SECRET",
+        "GOOGLE_API_KEY",
+        "GCP_API_KEY",
+        "GCLOUD_API_KEY",
+        "DIGITALOCEAN_ACCESS_TOKEN",
+        "DO_API_TOKEN"
+    };
+
+    public static bool IsCloudCredentialEnv(string key, string value) =>
+        CloudCredentialKeys.Contains(key) && IsLiteralSecretValue(value);
+
+    // Model base URL override (AES-MCP-008)
+    private static readonly HashSet<string> BaseUrlKeys = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "OPENAI_BASE_URL",
+        "OPENAI_API_BASE",
+        "OPENAI_API_BASE_URL",
+        "ANTHROPIC_BASE_URL",
+        "ANTHROPIC_API_URL",
+        "AZURE_OPENAI_ENDPOINT",
+        "COHERE_BASE_URL",
+        "GROQ_BASE_URL",
+        "MISTRAL_BASE_URL",
+        "LLM_BASE_URL",
+        "API_BASE_URL",
+        "OPENAI_BASE"
+    };
+
+    public static bool IsModelBaseUrlOverride(string key, string value)
+    {
+        if (!BaseUrlKeys.Contains(key))
+        {
+            return false;
+        }
+        var lower = value.ToLowerInvariant();
+        if (!lower.Contains("http://", StringComparison.Ordinal) && !lower.Contains("https://", StringComparison.Ordinal))
+        {
+            return false;
+        }
+        return !IsLocalHost(lower);
+    }
+
+    // Database connection string (AES-AUTH-005)
+    public static bool IsConnectionStringWithCredentials(string value) =>
+        ConnectionStringRegex().IsMatch(value);
+
+    [GeneratedRegex(@"\b(postgres|postgresql|mysql|mariadb|mongodb|mongodb\+srv|redis|rediss|mssql|sqlserver|amqp|amqps)://[^/\s:@]+:[^/\s@]+@", RegexOptions.IgnoreCase)]
+    private static partial Regex ConnectionStringRegex();
+
+    // Generic plaintext secret env (AES-AUTH-006)
+    private static readonly string[] SecretKeySuffixes =
+    [
+        "_TOKEN", "_SECRET", "_PASSWORD", "_PASSWD",
+        "_API_KEY", "_APIKEY", "_ACCESS_KEY", "_PRIVATE_KEY", "_CLIENT_SECRET"
+    ];
+
+    private static readonly HashSet<string> SecretKeyExact = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "TOKEN", "SECRET", "PASSWORD", "PASSWD", "APIKEY", "API_KEY", "ACCESS_TOKEN", "AUTH_TOKEN"
+    };
+
+    public static bool LooksLikeSecretEnvKey(string key)
+    {
+        var upper = key.ToUpperInvariant();
+        if (SecretKeyExact.Contains(upper))
+        {
+            return true;
+        }
+        return SecretKeySuffixes.Any(suffix => upper.EndsWith(suffix, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// True when the value is a concrete inline secret, not empty and not an
+    /// indirect reference like <c>${VAR}</c>, <c>$(cmd)</c>, <c>$VAR</c>, or <c>%VAR%</c>.
+    /// </summary>
+    public static bool IsLiteralSecretValue(string value)
+    {
+        var trimmed = value.Trim();
+        if (trimmed.Length < 6)
+        {
+            return false;
+        }
+        if (trimmed.StartsWith("${", StringComparison.Ordinal) || trimmed.StartsWith("$(", StringComparison.Ordinal))
+        {
+            return false;
+        }
+        if (trimmed.StartsWith('$'))
+        {
+            return false;
+        }
+        if (trimmed.StartsWith('%') && trimmed.EndsWith('%'))
+        {
+            return false;
+        }
+        return true;
+    }
+
+    // Supply-chain remote install (AES-MCP-009)
+    public static bool IsRemoteInstallScript(string command, IEnumerable<string> args)
+    {
+        var joined = string.Join(' ', new[] { command }.Concat(args)).ToLowerInvariant();
+        var downloadsAndPipesToShell =
+            (joined.Contains("curl", StringComparison.Ordinal) || joined.Contains("wget", StringComparison.Ordinal)) &&
+            (joined.Contains("| sh", StringComparison.Ordinal) || joined.Contains("|sh", StringComparison.Ordinal) ||
+             joined.Contains("| bash", StringComparison.Ordinal) || joined.Contains("|bash", StringComparison.Ordinal) ||
+             joined.Contains("| zsh", StringComparison.Ordinal) || joined.Contains("|zsh", StringComparison.Ordinal));
+        var powershellDownloadExec =
+            joined.Contains("iex", StringComparison.Ordinal) &&
+            (joined.Contains("irm", StringComparison.Ordinal) || joined.Contains("iwr", StringComparison.Ordinal) ||
+             joined.Contains("invoke-webrequest", StringComparison.Ordinal) || joined.Contains("invoke-restmethod", StringComparison.Ordinal));
+        return downloadsAndPipesToShell || powershellDownloadExec;
+    }
+
+    // Plaintext HTTP endpoint (AES-MCP-010)
+    public static bool IsPlaintextHttpEndpoint(string value)
+    {
+        var lower = value.ToLowerInvariant();
+        var idx = lower.IndexOf("http://", StringComparison.Ordinal);
+        if (idx < 0)
+        {
+            return false;
+        }
+        var rest = lower[(idx + "http://".Length)..];
+        var host = new string(rest.TakeWhile(c => c != '/' && c != ':' && c != ' ' && c != '"').ToArray());
+        return !IsLocalHostName(host);
+    }
+
+    // Sensitive credential paths (AES-MCP-011)
+    private static readonly string[] SensitivePathMarkers =
+    [
+        "/.ssh", "~/.ssh", ".ssh/",
+        "/.aws", "~/.aws", ".aws/",
+        "/.gnupg", ".gnupg",
+        "/.kube", ".kube/",
+        ".config/gcloud",
+        ".docker/config.json",
+        "/.netrc", ".netrc",
+        "id_rsa", "id_ed25519"
+    ];
+
+    public static bool ContainsSensitiveCredentialPath(string value)
+    {
+        var lower = value.Replace('\\', '/').ToLowerInvariant();
+        return SensitivePathMarkers.Any(marker => lower.Contains(marker, StringComparison.Ordinal));
+    }
+
+    // Docker daemon socket (AES-MCP-012)
+    public static bool GrantsDockerDaemonAccess(string value)
+    {
+        var lower = value.ToLowerInvariant();
+        return lower.Contains("docker.sock", StringComparison.Ordinal) || lower == "--privileged";
+    }
+
+    // Messaging / email exfiltration channel (AES-MCP-013)
+    private static readonly string[] MessagingMarkers =
+    [
+        "server-slack", "slack-mcp", "mcp-slack", "discord", "telegram",
+        "mattermost", "server-gmail", "gmail-mcp", "sendgrid", "mailgun",
+        "twilio", "whatsapp", "server-email"
+    ];
+
+    public static bool IsMessagingServer(IEnumerable<string> values)
+    {
+        var lowered = values.Select(v => v.ToLowerInvariant()).ToArray();
+        return lowered.Any(value => MessagingMarkers.Any(marker => value.Contains(marker, StringComparison.Ordinal)));
+    }
+
+    // Shared
+    private static bool IsLocalHost(string lowerValue) =>
+        lowerValue.Contains("localhost", StringComparison.Ordinal) ||
+        lowerValue.Contains("127.0.0.1", StringComparison.Ordinal) ||
+        lowerValue.Contains("0.0.0.0", StringComparison.Ordinal) ||
+        lowerValue.Contains("[::1]", StringComparison.Ordinal) ||
+        lowerValue.Contains("host.docker.internal", StringComparison.Ordinal);
+
+    private static bool IsLocalHostName(string host) =>
+        host is "localhost" or "127.0.0.1" or "0.0.0.0" or "::1" or "host.docker.internal" ||
+        host.StartsWith("192.168.", StringComparison.Ordinal) ||
+        host.StartsWith("10.", StringComparison.Ordinal) ||
+        host.StartsWith("172.", StringComparison.Ordinal);
 }

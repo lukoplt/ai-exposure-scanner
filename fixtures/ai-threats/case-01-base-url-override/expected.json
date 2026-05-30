@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-MCP-008",
+      "severity": "high",
+      "app": "ai-threats",
+      "serverName": "llm-proxy"
+    }
+  ]
+}

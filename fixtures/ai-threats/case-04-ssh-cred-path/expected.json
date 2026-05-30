@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-MCP-011",
+      "severity": "critical",
+      "app": "ai-threats",
+      "serverName": "fs-aws"
+    }
+  ]
+}

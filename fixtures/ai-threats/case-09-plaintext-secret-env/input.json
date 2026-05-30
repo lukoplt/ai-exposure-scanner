@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "internal-api": {
+      "command": "node",
+      "args": ["server.js"],
+      "env": {
+        "INTERNAL_SERVICE_TOKEN": "sometoken_abc123XYZ_plaintext"
+      },
+      "description": "Calls an internal API"
+    }
+  }
+}

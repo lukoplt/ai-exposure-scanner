@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-AUTH-006",
+      "severity": "high",
+      "app": "ai-threats",
+      "serverName": "internal-api"
+    }
+  ]
+}

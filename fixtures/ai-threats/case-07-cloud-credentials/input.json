@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "aws-tools": {
+      "command": "node",
+      "args": ["aws.js"],
+      "env": {
+        "AWS_ACCESS_KEY_ID": "AKIAIOSFODNN7EXAMPLE",
+        "AWS_SECRET_ACCESS_KEY": "wJalrXUtnFEMIbPxRfiCYEXAMPLEKEY1234567890"
+      },
+      "description": "Automates AWS resources"
+    }
+  }
+}

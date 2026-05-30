@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-AUTH-004",
+      "severity": "critical",
+      "app": "ai-threats",
+      "serverName": "aws-tools"
+    }
+  ]
+}

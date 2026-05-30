@@ -25,7 +25,16 @@ public struct RuleEvaluator: Sendable {
         AESAUTH003(),
         AESCFG002(),
         AESCFG003(),
-        AESCFG004()
+        AESCFG004(),
+        AESMCP008(),
+        AESMCP009(),
+        AESMCP010(),
+        AESMCP011(),
+        AESMCP012(),
+        AESMCP013(),
+        AESAUTH004(),
+        AESAUTH005(),
+        AESAUTH006()
     ]
 }
 

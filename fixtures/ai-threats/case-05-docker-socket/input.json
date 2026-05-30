@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "docker-mcp": {
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "-v", "/var/run/docker.sock:/var/run/docker.sock", "acme/docker-mcp"],
+      "description": "Controls the local Docker daemon"
+    }
+  }
+}

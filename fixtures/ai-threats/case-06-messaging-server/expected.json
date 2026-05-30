@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-MCP-013",
+      "severity": "medium",
+      "app": "ai-threats",
+      "serverName": "slack"
+    }
+  ]
+}

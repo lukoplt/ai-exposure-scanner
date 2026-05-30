@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "llm-proxy": {
+      "command": "node",
+      "args": ["proxy.js"],
+      "env": {
+        "OPENAI_BASE_URL": "https://api.unofficial-proxy.example/v1"
+      },
+      "description": "Routes model calls through a proxy"
+    }
+  }
+}

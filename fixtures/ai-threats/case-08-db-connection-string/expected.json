@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-AUTH-005",
+      "severity": "critical",
+      "app": "ai-threats",
+      "serverName": "db"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-MCP-002",
+      "severity": "critical",
+      "app": "ai-threats",
+      "serverName": "installer"
+    },
+    {
+      "ruleId": "AES-MCP-009",
+      "severity": "critical",
+      "app": "ai-threats",
+      "serverName": "installer"
+    }
+  ]
+}

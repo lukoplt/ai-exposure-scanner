@@ -1,0 +1,10 @@
+{
+  "findings": [
+    {
+      "ruleId": "AES-MCP-012",
+      "severity": "critical",
+      "app": "ai-threats",
+      "serverName": "docker-mcp"
+    }
+  ]
+}

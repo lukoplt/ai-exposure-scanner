@@ -30,6 +30,8 @@ This tool reads those configs and tells you, in plain language, what risks they 
 | Codex CLI | `~/.codex/` | MCP configs, auth token file presence |
 | Gemini CLI | `~/.gemini/` | MCP configs, API key stored in config |
 
+👉 **[Complete catalog of every scanned problem →](docs/SCANNED-CHECKS.md)** (24 detection rules, grouped by category)
+
 ## Risk levels
 
 | Level | Meaning |
@@ -43,9 +45,9 @@ Findings are **automatically escalated** when a dangerous combination appears �
 
 ---
 
-## Features (v0.2.0)
+## Features
 
-- **15 built-in detection rules** across MCP servers, auth files, privacy settings, and extensions
+- **24 built-in detection rules** across MCP servers, credentials, supply-chain, network/exfiltration, and config hygiene — see the [full catalog](docs/SCANNED-CHECKS.md)
 - **8 escalation rules** that upgrade severity for dangerous combinations
 - **7 detectors** including the new Claude CLI (Claude Code) integration
 - **YAML rule packs** — define org-specific rules, override built-in severities, add custom escalations (Settings → Rule Packs)
@@ -211,7 +213,7 @@ Rule pack IDs must not start with `AES-` (reserved for built-ins). Invalid packs
 git clone https://github.com/lukoplt/ai-exposure-scanner.git
 cd ai-exposure-scanner
 
-# Run the full fixture corpus (31 cases across all detectors)
+# Run the full fixture corpus (42 cases across all detectors)
 swift run --package-path macos/Scanner ScannerFixtureTests
 
 # Build the GUI app
@@ -284,7 +286,7 @@ Verifies every rule ID in `spec/RULES.md` is implemented in both Swift and C#. R
 
 ```
 spec/              Rule catalog, detector specs, JSON report schema
-fixtures/          Cross-platform golden test corpus (31 cases)
+fixtures/          Cross-platform golden test corpus (42 cases)
 macos/Scanner/     Swift Package — Scanner library, SwiftUI app, opt-in updater
 windows/           C# .NET 10 — Scanner library, WPF app, CLI, tests
 tools/drift-check/ CI parity enforcement (Python)
