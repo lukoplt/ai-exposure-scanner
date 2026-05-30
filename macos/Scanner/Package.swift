@@ -40,8 +40,7 @@ let package = Package(
         ),
         .executableTarget(
             name: "AIExposureScannerApp",
-            dependencies: ["Scanner"],
-            resources: [.process("buymeacoffee.png")]
+            dependencies: ["Scanner"]
         ),
         // Standalone helper that performs the GitHub Releases update check.
         // Lives in its own target so the Scanner library and the main app

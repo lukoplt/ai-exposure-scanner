@@ -474,8 +474,7 @@ public sealed class SettingsWindow : Window
                 Foreground = SecondaryText,
                 FontSize = 13,
                 Margin = new Thickness(0, 0, 0, 10)
-            },
-            BuildSupportButton()
+            }
         }));
 
         stack.Children.Add(closeBtn);
@@ -580,22 +579,6 @@ public sealed class SettingsWindow : Window
         return row;
     }
 
-    private static UIElement BuildSupportButton()
-    {
-        var btn = new Button
-        {
-            Content = "☕ Buy me a coffee",
-            HorizontalAlignment = HorizontalAlignment.Left,
-            Background = new SolidColorBrush(Color.FromRgb(0xFF, 0xE0, 0x17)),
-            Foreground = Brushes.Black,
-            BorderThickness = new Thickness(0),
-            Padding = new Thickness(16, 8, 16, 8),
-            FontWeight = FontWeights.SemiBold
-        };
-        btn.Click += (_, _) =>
-            Process.Start(new ProcessStartInfo("https://www.buymeacoffee.com/lukasoplt") { UseShellExecute = true });
-        return btn;
-    }
 }
 
 // MARK: - Main window -------------------------------------------------------

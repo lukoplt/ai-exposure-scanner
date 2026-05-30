@@ -336,5 +336,3 @@ If you fork, vendor, or redistribute, please preserve the `NOTICE` file and cred
 ## Support
 
 Built and maintained by **Lukáš Oplt**.
-
-If this tool saved you from an avoidable AI-config security incident, consider buying me a coffee: <https://www.buymeacoffee.com/lukasoplt> ☕

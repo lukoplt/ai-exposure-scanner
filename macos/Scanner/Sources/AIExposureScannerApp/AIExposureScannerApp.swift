@@ -880,20 +880,6 @@ struct SettingsView: View {
                 Text("Made with ❤️ by Lukáš Oplt")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-                Link(destination: URL(string: "https://www.buymeacoffee.com/lukasoplt")!) {
-                    HStack(spacing: 6) {
-                        Text("☕")
-                            .font(.footnote)
-                        Text(viewModel.selectedLanguage == .czech ? "Podpořit" : "Buy me a coffee")
-                            .font(.footnote.weight(.semibold))
-                            .foregroundStyle(.black)
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color(red: 1.0, green: 0.87, blue: 0.09))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
-                }
-                .buttonStyle(.plain)
             }
         }
         .padding(24)
